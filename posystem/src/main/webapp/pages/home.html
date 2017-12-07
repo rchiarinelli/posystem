@@ -1,0 +1,93 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<script type="text/javascript" src="/posystem/js/dojo/dojo.js" charset="utf-8" djConfig="parseOnLoad:true, locale: 'pt-br',"></script>
+<script src="/posystem/pages/scripts/renderLoginData.jsp"></script>
+<script type="text/javascript" src="/posystem/js/json/json2.js"></script>
+<script type="text/javascript" src="/posystem/pages/scripts/po_scripts.js"></script>
+<script type="text/javascript" src="/posystem/js/jquery-1.2.6.pack.js"></script>
+<script type="text/javascript" src="/posystem/js/jquery.maskedinput-1.2.2.min.js"></script>
+
+<script type="text/javascript">
+	dojo.require("dijit.layout.BorderContainer");
+	
+	dojo.addOnLoad(function(){
+		var basePath = "/posystem";
+		dojo.setObject("basePath",basePath);
+		openPage('mainContent', '/pages/dashboard.html');
+	});
+
+	function doLogoff() {
+		var url = dojo.getObject("basePath") + "/services/"+dojo.getObject('subscriber')+"/utilities/logoff";
+		dojo.xhrGet({
+            url: url
+            ,headers: {
+                "Content-Type": "text/plain"
+            }
+            ,handleAs: "json"
+            ,preventCache:true
+            ,load: function(data,args){
+				if (data.serviceResponse.status.$=='0'){
+					var url = dojo.getObject("basePath") + "/index.html";
+					redirectPage(url);
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+	
+    
+</script>
+<title>USI+ - Sistema de controle de ordens de serviço</title>
+<link rel="stylesheet" href="/posystem/styles.css" type="text/css" />
+<style type="text/css">
+    @import "/posystem/js/dijit/themes/tundra/tundra.css";
+    @import "/posystem/js/dojox/grid/enhanced/resources/tundraEnhancedGrid.css";
+	@import "/posystem/js/dojox/grid/resources/Grid.css";
+	  .dojoxGrid table {
+	    margin: 0;
+	  }
+    @import "/posystem/js/dojo/resources/dojo.css";
+    @import "/posystem/js/dojox/grid/resources/tundraGrid.css";
+    
+</style></head>
+<body class="tundra">
+
+<div id="wrap">
+	<div class="header">
+		<div class="title">
+			<h1><a href="/posystem/index.html">USI+</a></h1>
+			<h2>Sistema gerenciador de Ordens de Serviços</h2>
+		</div>
+		<div class="nav">
+			<ul>
+				<li><a href="home.html">Home</a></li>
+				<li><a href="#" onclick="openPage('mainContent','/pages/order/order_home.html');">Pedidos</a></li>
+				<li class="style1"><a href="#" onclick="openPage('mainContent','/pages/po/production_orders.html');">OS</a></li>
+				<li><a href="#" onclick="openPage('mainContent','/pages/customer/customer_home.html');">Clientes</a></li>
+				<li><a href="#" onclick="openPage('mainContent','/pages/report/report_home.html');">Relat&oacute;rios</a></li>
+				<!-- <li><a href="#">Configurações</a></li>-->
+				<li><a href=# onclick="doLogoff();">Sair</a></li>
+			</ul>
+		</div>
+		<div class="clear"></div>
+	</div>
+
+	<div class="pagewrapper">
+		<div class="innerpagewrapper">
+			<div class="page">
+                <div dojoType="dijit.layout.BorderContainer" id="mainContent">
+                </div>
+				<div class="footer">
+					<p><a href="#" title="valid XHTML">Brainy IT</a> </p> 
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+</body>
+</html>

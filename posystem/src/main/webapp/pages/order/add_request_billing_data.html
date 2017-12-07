@@ -1,0 +1,261 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+    dojo.require("dojox.grid.DataGrid");
+    dojo.require("dojo.data.ItemFileWriteStore");
+    dojo.require("dojox.data.StoreExplorer");
+
+    var layout = [
+                 { field: 'value', name: 'Valor'     , width:'auto'}
+    			,{ field: 'date' , name: 'Vencimento', width:'auto', editable:true}
+    			];
+
+    var grid = null;
+    
+    var storeItems = null;
+    
+	var paymentType = null;
+    
+	dojo.addOnLoad(function(){
+		if (checkURL()){
+			loadProperties();
+			$("#paymentQtdTxt").mask("9?9",{placeholder:" "});
+		} else {
+			openPage('mainContent','/pages/order/filter_order.html');
+		}
+	});
+
+	function checkURL(){
+		var requestId = dojo.getObject('requestId');
+		if (requestId==null || requestId==''){
+			return false;
+		}
+		return true;			
+	}
+
+
+	function loadProperties(){
+		loadRequest();
+		changePaymentQtdTxtStatus();
+	}
+
+	function loadRequest(){
+		var requestId = dojo.getObject('requestId');
+		var url= dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/get/" + requestId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+				if (response.serviceResponse.status.$=='0'){
+					dojo.html.set(dojo.byId("orderCode"), response.serviceResponse.viewBeanResponse.code.$,{	parseContent: true	});
+	                dojo.byId('customer').value=response.serviceResponse.viewBeanResponse.customer.$;
+	                if (response.serviceResponse.viewBeanResponse.price!=null){
+	                	dojo.byId('price').value=response.serviceResponse.viewBeanResponse.price.$;
+	                }
+				}else if (response.serviceResponse.status.$=='1'){
+					showMessages(response.serviceResponse.message.$);
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+	
+	function loadGrid(response){
+        if (grid) {
+            grid.destroy();
+            grid = null;
+        }
+        if (this.storeItems) {
+        	this.storeItems = null;
+        }
+        var tempGrid = dijit.byId('billingRequestGridValues');
+		if (tempGrid!=null){
+			tempGrid.destroy();
+			tempGrid = null;
+		}
+
+        var jsonStore =	new dojo.data.ItemFileWriteStore({ data: response
+        			,urlPreventCache:true });
+        
+        var populateStoreItems = function(items,request) {
+        	this.storeItems = new Array();
+        	for (var i = 0; i < items.length; i++){
+        		this.storeItems.push(items[i]);
+        	    
+        	}
+        }
+        
+        if (response.items.length==0){
+        	dojo.byId("gridPanel").style.display='none';
+            return;
+        }
+        jsonStore.fetch({onComplete: populateStoreItems});
+        grid = new dojox.grid.DataGrid({
+            id: 'billingRequestGridValues' 
+            ,store: jsonStore
+            //,autoHeight: 'yes' 
+            ,structure: layout
+            ,errorMessage:'Ocorreu um erro durante a carga dos dados.'
+            ,selectionMode:'single'
+            ,clientSort:true
+        });
+        dojo.byId("gridPanel").style.display='block';
+		dojo.byId('gridNode').appendChild(grid.domNode);
+		grid.onFetchError = function(err, req) { console.log('Error..: '+err + '. Req..: ' + req.toString()); }
+		grid.startup();                             
+	}	
+	
+	
+	function changePaymentQtdTxtStatus(src) {
+		var paymentQtdTxt = dojo.byId('paymentQtdTxt')
+		if (src==null || src.value=='v') {
+			paymentQtdTxt.disabled = true;			
+		} else if(src.value='p') {
+			paymentQtdTxt.disabled = false;
+		}
+		//console.log(paymentQtdTxt.disabled);
+	}
+
+	function defineAtSightPaymentData() {
+		var requestId = dojo.getObject('requestId');
+		this.paymentType = 'v';
+		loadPaymentData(requestId,this.paymentType,1);
+	}
+	
+	function defineInstallmentsPaymentData() {
+		var requestId = dojo.getObject('requestId');
+		var qtd = dojo.byId("paymentQtdTxt").value;
+		this.paymentType='p';
+		loadPaymentData(requestId,this.paymentType,qtd);
+	}
+	
+	function loadPaymentData(requestId, type, qtd) {
+		var url= dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/get/billingvalues/" + requestId + "&" +type+ "&" + qtd;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                if (response.processBillingValues.status.$=='0') {
+					var jsonResponse = JSON.parse(response.processBillingValues.gridValue.$);
+					loadGrid(jsonResponse);
+                } else {
+                	showMessages(response.processBillingValues.message.$);
+                }
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });	
+	}
+	
+	function processBilling() {
+		if (this.storeItems!=null) {
+			var orderId = dojo.getObject('requestId');
+			var jsonRequest ='{"processBillingBean" :{';
+			jsonRequest += '"orderId" : {"$":"'+orderId+'"}';
+			jsonRequest += ',"paymentType" : {"$":"'+this.paymentType+'"}';
+			
+			jsonRequest += ',"values":[';
+			var hasItems = false
+			for(var i=0;i<this.storeItems.length;i++) {
+				if (hasItems) {
+					jsonRequest += ',';					
+				}
+				jsonRequest+='{';
+				jsonRequest+='"value":{"$" :"'+this.storeItems[i].value+'"}';
+				jsonRequest+=',"date":{"$" :"'+this.storeItems[i].date+'"}';
+				jsonRequest+='}';
+				hasItems=true;
+			}
+			jsonRequest+=']';
+				
+			
+			jsonRequest += '}';		
+			jsonRequest += '}';
+			
+			//Invocar servico e salvar
+			dojo.xhrPost({
+				url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/processbilling",
+				postData: jsonRequest,
+	               headers: {
+	                   "Content-Type": "application/json"
+	               },
+	               handleAs: "json",
+	               load: function(data,ioargs){
+	                  	if (data.serviceResponse.status.$=='0'){
+	                  		openPage('mainContent','/pages/order/filter_order_for_billing.html');
+	                   	}else if (data.serviceResponse.status.$=='1' ){
+	                   		showMessages(data.serviceResponse.message.$);
+	                   	} 
+   		            },
+	            // if any error occurs, it goes here:
+	            error: function(error,args){
+	    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde."+error);
+	            }	         
+		     });			
+			
+		}
+	}
+	
+	
+	
+</script>
+</head>
+<body class="tundra">
+
+<div id="wrap">
+	<div class="content">
+		<div id="messages"></div>
+		<h3>Faturar pedido</h3>
+		<h5>Informe os dados do faturamento do pedido: <span id="orderCode"></span></h5>
+		<br/>
+		<p>
+			<label for="customer">Cliente:</label><br />
+			<input type="text" name="customer" id="customer" readonly="readonly" />					
+		</p>
+		<p>
+			<label for="price">Pre&ccedil;o:</label><br />
+			<input type="text" name="price" id="price" readonly="readonly"/><br />
+		</p>
+		<form id="paymentForm" action="#">
+			<p>
+			<input type="radio" id="paymentType" name="paymentType" value="v" onclick="changePaymentQtdTxtStatus(this);defineAtSightPaymentData();"/> &Agrave; vista
+			&nbsp;
+			<input type="radio" id="paymentType" name="paymentType" value="p" onclick="changePaymentQtdTxtStatus(this);" /> Parcelado
+			&nbsp;
+			<input type="text" id="paymentQtdTxt" name="paymentQtdTxt" style="width: 35px" maxlength="3"/> vezes
+			&nbsp;
+			<input type="button" id="process" name="process" value="Calcular" class="formbutton" onclick="defineInstallmentsPaymentData();"/>
+			</p>
+		</form>
+
+		<div id="gridPanel" style="display: none;">
+			<div id="gridNode" dojoType="dojox.grid.DataGrid" style="height:150px;"></div>
+		</div>
+		<br/>
+		<form action="#">
+			<p>
+				<input type="button" id="executeBilling" name="executeBilling" class="formbutton" value="Processar" onclick="processBilling();"/>
+				<input type="button" id="cancel" name="cancel" class="formbutton" value="Cancelar"  onclick="openPage('mainContent','/pages/order/filter_order_for_billing.html')"/>
+			</p>
+		</form>
+	</div>
+</div>
+</body>
+</html>

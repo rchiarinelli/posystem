@@ -1,0 +1,269 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.Dialog");
+	dojo.require("dijit.form.DateTextBox");
+    
+    
+    var installmentDialog;
+    
+	dojo.addOnLoad(function(){
+		loadProperties();			
+	});
+
+	function loadProperties(){
+		
+    	installmentDialog = new dijit.Dialog({
+            title: "Dados da parcela",
+            style: "width: 500px;height:350px;"
+        });
+    	
+		var fromDate = new Date();
+		var toDate = new Date();
+		
+		var fromDateStr = dojo.date.locale.format(fromDate, {
+			 selector: 'date',
+			 datePattern: 'dd-MM-yyyy'
+			});		
+		
+		var toDateStr = dojo.date.locale.format(toDate, {
+			 selector: 'date',
+			 datePattern: 'dd-MM-yyyy'
+			});			
+		
+		var days = dojo.byId("daysGapCb").value;
+		
+		loadRequestValues(fromDateStr,toDateStr);
+		loadPOValues(fromDateStr,toDateStr);
+		loadInstallments(days);
+	}
+
+	function loadRequestValues(fromDateStr,toDateStr){
+		var url= dojo.getObject('basePath') + "/services/"+dojo.getObject('subscriber')+ "/order/get/ordersdashboardvalues/"+fromDateStr+"&"+toDateStr;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                dojo.html.set(dojo.byId("openReq"), response.requestValues.open.value.$,{	parseContent: true	});
+                dojo.html.set(dojo.byId("execReq"), response.requestValues.executing.value.$,{	parseContent: true	});
+                dojo.html.set(dojo.byId("billedReq"), response.requestValues.billed.value.$,{	parseContent: true	});
+                dojo.html.set(dojo.byId("closedReq"), response.requestValues.closed.value.$,{	parseContent: true	});
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });			
+	}
+
+	function loadPOValues(fromDateStr,toDateStr){
+		var url= dojo.getObject('basePath') +  "/services/"+dojo.getObject('subscriber')+"/po/get/dashboardvalues/"+fromDateStr+"&"+toDateStr;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                dojo.html.set(dojo.byId("planningOS"), response.poValues.planning.value.$,{	parseContent: true	});
+                dojo.html.set(dojo.byId("inProdOS"), response.poValues.production.value.$,{	parseContent: true	});
+                dojo.html.set(dojo.byId("concOS"), response.poValues.concluded.value.$,{	parseContent: true	});
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });	
+	}
+	
+	function loadInstallments(days) {
+		var url= dojo.getObject('basePath') +  "/services/"+dojo.getObject('subscriber')+"/installments/pendinginstallments/by/"+days+"/days";
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+            	//console.log(response);
+            	dojo.empty("installments");
+            	if (response.pendingInstallments.installments!=null) {
+                	var installments = response.pendingInstallments.installments;
+                	var ul = dojo.create("ul", null, "installments");
+                   	var items = new Array();
+                   	var item = null;
+                	if (installments.length==null) {
+            			item = "<a href=\"#\" onclick=\'getInstallment("+installments.id.$+");\'>" + installments.date.$ + "&nbsp;-&nbsp;" + installments.value.$ + "</a>";
+            			items.push(item);
+                	} else {
+                		for (var i = 0; i < installments.length; i++) {
+                			item = "<a href=\"#\" onclick=\'getInstallment("+installments[i].id.$+");\'>" + installments[i].date.$ + "&nbsp;-&nbsp;" + installments[i].value.$ + "</a>";
+                			items.push(item);
+                		}
+                	}
+                   	dojo.forEach(items, function(data){
+                     	  dojo.create("li", { innerHTML: data }, ul);
+					});                	
+            	}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });	
+	}
+	
+	function refreshIntallments() {
+		var days = dojo.byId("daysGapCb").value;
+		loadInstallments(days);
+	}
+	
+	
+	function refreshData() {
+		var fromDate = dojo.byId("fromDate").value;
+		var toDate = dojo.byId("toDate").value;
+		if (fromDate!='' && toDate!='') {
+			var fromDateStr = fromDate.replace("/","-").replace("/","-");
+			var toDateStr = toDate.replace("/","-").replace("/","-");
+			
+			loadRequestValues(fromDateStr,toDateStr);
+			loadPOValues(fromDateStr,toDateStr);
+			
+		}
+	}
+	
+	function getInstallment(instId) {
+		var url= dojo.getObject('basePath') +   "/services/"+dojo.getObject('subscriber')+"/installments/get/" + instId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+            	//console.log(response);
+            	var installment = response.installmentDashboard.installment;
+            	var installmentContent = "";
+            	installmentContent += "<p>Cliente:";
+            	installmentContent += installment.customerName.$;
+            	installmentContent += "</p>";
+            	installmentContent += "<p>C&oacute;digo do pedido:";
+            	installmentContent += installment.orderCode.$;
+            	installmentContent += "</p>";
+            	installmentContent += "<p>Pre&ccedil;o do pedido:";
+            	installmentContent += installment.orderFinalPrice.$;
+            	installmentContent += "</p>";
+            	installmentContent += "<p>Data de vencimento:";
+            	installmentContent += installment.date.$;
+            	installmentContent += "</p>";
+            	installmentContent += "<p>Valor da parcela:";
+            	installmentContent += installment.value.$;
+            	installmentContent += "</p>";
+            	installmentContent += "<p>Status:";
+            	installmentContent += installment.status.$;
+            	installmentContent += "</p>";
+            	installmentDialog.attr("content", installmentContent);
+            	installmentDialog.show();
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });		
+	}
+	
+</script>
+</head>
+<body>
+<div id="wrap">
+	<div class="content">
+		<h3>Painel de informa&ccedil;&otilde;es</h3>
+		<form id="intervalForm" name="intervalForm" method="post">
+			<p>
+				<label for="fromDate">
+					De:			
+				</label>
+				<input type="text" name="fromDate" id="fromDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}" 
+				style="width: 120px;"/>
+				&nbsp;
+				<label for="toDate">
+					At&eacute;:
+				</label>
+				&nbsp;
+				<input type="text" name="toDate" id="toDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"
+				style="width: 120px;"/>
+				&nbsp;
+				<input type="button"" id="refresh" name="refresh" value="Atualizar" onclick="refreshData();"  class="formbutton"/>
+			</p>
+		</form>
+		<div id="messages"></div>
+		
+		<table>
+			<tr>
+				<td>&nbsp;</td>
+				<td>Pedidos</td>
+			</tr>
+			<tr>
+				<td>Abertos:</td>
+				<td id="openReq"></td>
+			</tr>
+			<tr>
+				<td>Em execu&ccedil;&atilde;o:</td>
+				<td id="execReq"></td>
+			</tr>
+			<tr>
+				<td>Finalizados:</td>
+				<td id="closedReq"></td>
+			</tr>						
+			<tr>
+				<td>Faturados:</td>
+				<td id="billedReq"></td>
+			</tr>
+		</table>
+	
+		<table>
+			<tr>
+				<td>&nbsp;</td>
+				<td>Ordens de servi&ccedil;o</td>
+			</tr>
+			<tr>
+				<td>Em planejamento:</td>
+				<td id="planningOS"></td>
+			</tr>
+			<tr>
+				<td>Em produ&ccedil;&atilde;o:</td>
+				<td id="inProdOS"></td>
+			</tr>
+			<tr>
+				<td>Concluidas:</td>
+				<td id="concOS"></td>
+			</tr>						
+		</table>
+	</div>
+	<div class="sidebar">			
+		<h4>Pagamentos a receber</h4>
+		<br/>
+		<form id="installmentsForm" action="#" >
+			<p>
+			<select id="daysGapCb" name="daysGapCb" onchange="refreshIntallments();">
+				<option value="10">10 dias</option>
+				<option value="20">20 dias</option>
+				<option value="30">30 dias</option>
+				<option value="40">40 dias</option>
+			</select>					
+			</p>
+		</form>
+		<div id="installments" style="overflow: auto;height: 250px;">
+		</div>
+	</div>
+
+</div>
+</body>
+</html>

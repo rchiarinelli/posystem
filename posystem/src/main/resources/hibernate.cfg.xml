@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-configuration PUBLIC
+    "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+    "http://hibernate.sourceforge.net/hibernate-configuration-3.0.dtd">
+<hibernate-configuration>
+	<session-factory>
+		<!-- Database connection settings -->
+		<property name="hibernate.connection.datasource">java:/comp/env/jdbc/POSystemDB</property>
+
+		<property name="hibernate.connection.autocommit">false</property>
+		<property name="hibernate.connection.release_mode">after_transaction</property>
+		<property name="hibernate.jdbc.batch_size">10</property>
+
+
+        <!-- SQL dialect -->
+		<property name="dialect">org.hibernate.dialect.MySQL5InnoDBDialect</property>
+
+        <!-- Enable Hibernate's automatic session context management -->
+		<property name="current_session_context_class">thread</property>
+
+
+        <!-- Echo all executed SQL to stdout -->
+		<property name="show_sql">true</property>
+
+
+		<property name="hbm2ddl.auto">update</property>
+
+		<!-- Entities -->		
+		<mapping class="br.valinorti.posystem.entity.Customer" />
+		<mapping class="br.valinorti.posystem.entity.PFCustomer" />
+		<mapping class="br.valinorti.posystem.entity.PJCustomer" />
+		<mapping class="br.valinorti.posystem.entity.CustomerContact" />
+		<mapping class="br.valinorti.posystem.entity.CustomerAddress" />
+		<mapping class="br.valinorti.posystem.entity.Order" />
+		<mapping class="br.valinorti.posystem.entity.ProductionOrder" />
+		<mapping class="br.valinorti.posystem.entity.Billing" />
+		<mapping class="br.valinorti.posystem.entity.Installment" />
+		<mapping class="br.valinorti.posystem.entity.Subscriber" />
+		<mapping class="br.valinorti.posystem.entity.User" />
+		<mapping class="br.valinorti.posystem.entity.Permission" />
+		<mapping class="br.valinorti.posystem.entity.Resource" />
+		
+	</session-factory>
+</hibernate-configuration>

@@ -1,0 +1,175 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit");
+	dojo.require("dojox.grid.cells.dijit");
+	dojo.require("dojox.data.CsvStore");
+	dojo.require("dojox.grid.DataGrid");
+    
+    var layout = [
+					{ field: 'customerName'  , name: 'Cliente', width:'auto'}
+					,{ field: 'orderCode'   , name: 'C&oacute;digo do pedido', width:'auto'  }
+					,{ field: 'date'      , name: 'Data faturamento', width:'auto'}
+					,{ field: 'status'   , name: 'Situa&ccedil;&atilde;o', width:'auto' }
+					,{ field: 'value'   , name: 'Valor', width:'auto' }
+                 ];
+    
+    var grid = null;
+    
+    var totalValue = null;
+    
+	function proccessReport() {
+		var fromDate = dojo.byId('fromDate').value;
+		var toDate = dojo.byId('toDate').value;
+		
+		if ((fromDate!=null && fromDate!='') && (toDate!=null && toDate!='')) {
+			var fromDateStr = fromDate.replace("/","-").replace("/","-");
+			var toDateStr = toDate.replace("/","-").replace("/","-");		
+			
+			var url = dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/billing/get/report/totalbyperiod/"+fromDateStr+"/"+toDateStr;
+			
+			//Invocar servico e salvar
+			dojo.xhrGet({
+				url: url
+	            ,headers: {
+	                "Content-Type": "text/plain"
+	             },
+	             handleAs: "text",
+	             load: function(response,ioargs){
+						var jsonResponse = JSON.parse(response);
+						loadGrid(jsonResponse);
+		         },
+	            // if any error occurs, it goes here:
+	            error: function(error,args){
+	    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\n:" + error);
+	            }	         
+		     });	
+		}
+	}
+	
+	
+	function loadGrid(jsonResponse) {
+		if (totalValue) {
+			totalValue = null;
+		}
+        if (grid) {
+            grid.destroy();
+            grid = null;
+        }
+        var tempGrid = dijit.byId('billingReport');
+		if (tempGrid!=null){
+			tempGrid.destroy();
+			tempGrid = null;
+		}
+        
+		showMessages('O filtro retornou '+ jsonResponse.items.length + ' resultado(s).');
+		var jsonStore = new dojo.data.ItemFileReadStore({ data : jsonResponse });
+
+        var gotItems = function(items, request){
+            itemCount = items.length
+           	dojo.forEach(items, function(data){
+           		totalValue = Number(totalValue) + Number(data.value);
+			});              
+        };
+        if (jsonResponse.items.length==0){
+        	dojo.byId("gridPanel").style.display='none';
+            return;
+        }
+        jsonStore.fetch({onComplete: gotItems});
+        grid = new dojox.grid.DataGrid({
+            id: 'billingReport', 
+            store: jsonStore, 
+            autoHeight: 'yes', 
+            structure: layout,
+            errorMessage:'Ocorreu um erro durante a carga dos dados.',
+            selectionMode:'single',
+            clientSort:true
+          });
+		console.log('Building grid.');
+        dojo.byId("gridPanel").style.display='block';
+		dojo.byId('gridNode').appendChild(grid.domNode);
+		grid.onFetchError = function(err, req) { console.log('Error..: '+err + '. Req..: ' + req.toString()); }
+		grid.startup();
+		console.log(dojo.number.format(totalValue));
+		dojo.html.set(dojo.byId("totalValue"), dojo.number.format(totalValue),{	parseContent: true	});
+	}
+	
+	function exportPdf() {
+		var fromDate = dojo.byId('fromDate').value;
+		var toDate = dojo.byId('toDate').value;		
+		var path = dojo.getObject("basePath") + '/GenerateReportServlet?repName=billingTotalByPeriod&fromDate='+fromDate+'&toDate='+toDate+'&repType=pdf';
+		exportToReport(path);
+	}
+	
+	function exportCsv() {
+		var fromDate = dojo.byId('fromDate').value;
+		var toDate = dojo.byId('toDate').value;		
+		var path = dojo.getObject("basePath") + '/GenerateReportServlet?repName=billingTotalByPeriod&fromDate='+fromDate+'&toDate='+toDate+'&repType=csv';
+		exportToReport(path);
+	}
+	
+	function exportToReport(path) {
+		var iframe = dojo.create("iframe");
+
+		iframe.src = path;
+		iframe.style.display = "none";
+		dojo.place(iframe,'reportDiv');		
+	}
+	
+	
+</script>
+</head>
+<body class="tundra">
+
+<div id="wrap">
+	<div class="content">
+		<h3>Faturamento por per&iacute;odo</h3>
+		<div id="messages"></div>					
+		<form action="#">
+			<table>
+				<tr>
+					<td colspan="2">
+						Data de faturamento
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<label for="fromDeliverDate">De:</label>
+						<input type="text" name="fromDate" id="fromDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"></input>								
+					</td>
+					<td>
+						<label for="toDeliverDate">At&eacute;:</label>
+						<input type="text" name="toDate" id="toDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"></input>				
+					</td>
+				</tr>
+			</table>
+			
+			<p>
+				<input type="button" id="generate" name="generate" class="formbutton" value="Gerar relat&oacute;rio"  onclick="proccessReport();"/>
+				<input type="button" id="back" name="back" class="formbutton" value="Voltar"  onclick="openPage('mainContent','/pages/report/report_home.html');"/>
+			</p>
+		</form>
+		<div id="gridPanel" style="display: none;">
+			<div id="gridNode" dojoType="dojox.grid.DataGrid" style="height:150px;"></div>
+			<br/>
+			Total faturado no per&iacute;odo:<span id="totalValue"></span>
+			<br/>
+			<br/>
+			<form action="#">
+				<p>
+				<input type="button" id="exportToPDF" name="exportToPDF" class="formbutton" value="Exportar para PDF" onclick="exportPdf();"/>
+				<input type="button" id="exportToCSV" name="exportToCSV" class="formbutton" value="Exportar para CSV" onclick="exportCsv();"/>
+				</p>
+			</form>
+			
+		</div>
+	</div>
+</div>
+<div id="reportDiv">
+</div>
+</body>
+</html>

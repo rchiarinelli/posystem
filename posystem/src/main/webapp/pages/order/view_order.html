@@ -1,0 +1,278 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+  	dojo.require("dojox.grid.cells.dijit");
+    dojo.require("dojox.data.CsvStore");
+    dojo.require("dojox.grid.DataGrid");
+    dojo.require("dijit.form.Button");
+
+    var layout = [
+                  { field: 'poNumber'   , name: 'C&oacute;digo'  , width:'auto'}
+                  ,{ field: 'customer'  , name: 'Cliente', width:'auto'}
+                  ,{ field: 'request'      , name: 'Pedido', width:'auto'}
+                  ,{ field: 'dueDate'   , name: 'Data entrega' , width:'auto'}
+                  ,{ field: 'status'   , name: 'Status' , width:'auto'}
+                 ];
+
+    var grid = null;
+    
+	dojo.addOnLoad(function(){
+		if (checkURL()){
+			loadProperties();			
+		} else {
+			openPage('mainContent','/pages/order/order_request.html');
+		}
+	});
+
+	function checkURL(){
+		var requestId = dojo.getObject('requestId');
+		if (requestId==null || requestId==''){
+			return false;
+		}
+		return true;			
+	}
+
+
+	function loadProperties(){
+		loadRequest();
+		loadPOs();
+	}
+
+	function loadRequest(){
+		var requestId = dojo.getObject('requestId');
+		var url=dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/get/" + requestId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                console.log(response);
+				if (response.serviceResponse.status.$=='0'){
+	                dojo.html.set(dojo.byId("poCode"), response.serviceResponse.viewBeanResponse.code.$,{	parseContent: true	});
+	                dojo.byId('customer').value=response.serviceResponse.viewBeanResponse.customer.$;
+	                dojo.byId('openDate').value=response.serviceResponse.viewBeanResponse.openDate.$;
+	                if (response.serviceResponse.viewBeanResponse.price!=null){
+	                	dojo.byId('price').value=response.serviceResponse.viewBeanResponse.price.$;
+	                }
+	                dojo.byId('qtd').value=response.serviceResponse.viewBeanResponse.qtd.$;
+	                dojo.byId('description').value=unescape(response.serviceResponse.viewBeanResponse.description.$);
+	                dojo.byId('status').value=response.serviceResponse.viewBeanResponse.status.$;
+	                if (response.serviceResponse.viewBeanResponse.status.$=='Cancelado' 
+		                || response.serviceResponse.viewBeanResponse.status.$=='Fechado'){
+	                    //Desabilitar os botoes de cancelar e fechar pedido
+	                    dojo.byId("close").disabled='disabled';
+	                    dojo.byId("close").style.display='none';
+	                    dojo.byId("cancel").style.display='none';
+	                    dojo.byId("cancel").disabled='disabled';
+	                } 					
+
+	                if (response.serviceResponse.viewBeanResponse.deliverDate!=null){
+	                	dojo.byId('deliverDate').value=response.serviceResponse.viewBeanResponse.deliverDate.$;
+	                }
+				}else if (response.serviceResponse.status.$=='1'){
+					showMessages(response.serviceResponse.message.$);
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+
+	function loadPOs(){
+		var requestId = dojo.getObject('requestId');
+		var url= dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/get/byorder/" + requestId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(jsonResponse,args){
+                
+                if (grid) {
+                    grid.destroy();
+                    grid = null;
+                }
+
+                var tempGrid = dijit.byId('productioOrdersByRequestGrid');
+        		if (tempGrid!=null){
+        			console.warn('filterRequestGrid already exists on DOM Tree.Destroying the the existing one');
+        			tempGrid.destroy();
+        			tempGrid = null;
+        		}
+
+        		var jsonStore = new dojo.data.ItemFileReadStore({ data : jsonResponse });
+        		console.log(jsonStore);
+
+                var gotItems = function(items, request){
+                    // alert("Total Count of Items in DataStore: " + items.length);
+                    itemCount = items.length
+                    console.log('Total count of items in datastore..:' + itemCount);
+                };
+
+                if (jsonResponse.items.length==0){
+                	dojo.byId("gridPanel").style.display='none';
+                    return;
+                }
+                jsonStore.fetch({onComplete: gotItems});
+                //var sortKeys = [ {attribute: 'code', descending: false} ];
+                grid = new dojox.grid.DataGrid({
+                    id: 'productioOrdersByRequestGrid', 
+                    store: jsonStore, 
+                    autoHeight: 'yes', 
+                    //sort: sortKeys,
+                    structure: layout,
+                    errorMessage:'Ocorreu um erro durante a carga dos dados.',
+                    clientSort:true
+                  });
+
+                dojo.byId("gridPanel").style.display='block';
+        		dojo.byId('gridNode').appendChild(grid.domNode);
+        		grid.onFetchError = function(err, req) { console.log('Error..: '+err + '. Req..: ' + req.toString()); }
+        		grid.startup();   
+                
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+
+	function goToEditPage(){
+		var requestId = dojo.getObject('requestId');
+		var path = '/pages/order/edit_order.html?requestId=' + requestId;
+		openPage('mainContent',path);
+	}
+	function showMessages(msg){
+		//messagesBox.innerHtml=msg;
+		//messagesBox.textContent=msg;
+		dojo.byId("messages").style.display='block';		
+		console.log(msg);
+	  	dojo.html.set(dojo.byId("messages"), msg, 
+	  		  		{
+			      		parseContent: true
+			      	});
+	}
+
+	function closeRequest(){
+		var requestId = dojo.getObject('requestId');
+		var url= dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/close/" + requestId;
+		dojo.xhrPut({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                console.log(response);
+                if (response.serviceResponse.status.$=='0'){
+                    console.log('Pedido fechado.Status ' + response.serviceResponse.status.$);
+					//Atualizar o campo de status
+					dojo.byId('status').value=response.serviceResponse.viewBeanResponse.status.$;
+                    //Desabilitar os botoes de cancelar e fechar pedido
+                    dojo.byId("close").disabled='disabled';
+                    dojo.byId("close").style.display='none';
+                    dojo.byId("cancel").style.display='none';
+                    dojo.byId("cancel").disabled='disabled';
+                }                 
+				showMessages(response.serviceResponse.message.$);
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+
+	function cancelRequest(){
+		var requestId = dojo.getObject('requestId');
+		var url=dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/cancel/" + requestId;
+		dojo.xhrPut({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                console.log(response);
+                if (response.serviceResponse.status.$='0'){
+					//Atualizar o campo de status
+					dojo.byId('status').value=response.serviceResponse.viewBeanResponse.status.$;
+                    //Desabilitar os botoes de cancelar e fechar pedido
+                    dojo.byId("close").disabled='disabled';
+                    dojo.byId("close").style.display='none';
+                    dojo.byId("cancel").style.display='none';
+                    dojo.byId("cancel").disabled='disabled';
+                } 
+                showMessages(response.serviceResponse.message.$);                
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}	
+	
+</script>
+</head>
+<body class="tundra">
+
+<div id="wrap">
+	<div class="content">
+		<div id="messages"></div>
+		<h3>Detalhes do pedido: <span id="poCode"></span></h3>
+		<br/>
+		<p><label for="customer">Cliente:</label><br />
+			<input type="text" name="customer" id="customer" readonly="readonly" />					
+		</p>
+
+		<p><label for="openDate">Data abertura:</label><br />
+		<input type="text" name="openDate" id="openDate" readonly="readonly" /></p>
+					
+		<p><label for="description">Descri&ccedil;&atilde;o:</label><br />
+			<textarea id="description" name="description" rows="5" cols="50" readonly="readonly">
+			</textarea>
+		</p>
+		<p><label for="deliverDate">Data de entrega:</label><br />
+		<input type="text" name="deliverDate" id="deliverDate" readonly="readonly" /></p>
+		<table>
+			<tr>
+				<td>
+					<p><label for="qtd">Quantidade:</label><br />
+					<input type="text" name="qtd" id="qtd" readonly="readonly"/><br /></p>
+				</td>
+				<td>
+					<p><label for="price">Pre&ccedil;o:</label><br />
+					<input type="text" name="price" id="price" readonly="readonly"/><br /></p>
+				</td>
+			</tr>
+		</table>
+		<p><label for="status">Status:</label><br />
+			<input type="text" name="status" id="status" readonly="readonly"/><br /></p>
+		</p>					
+		<div id="gridPanel" style="display: none;">
+			<div id="gridNode" dojoType="dojox.grid.DataGrid" style="height:150px;"></div>
+		</div>
+		<form action="#">
+			<p>
+				<input type="button" id="back" name="back" class="formbutton" value="Voltar" onclick="openPage('mainContent','/pages/order/filter_order.html');"/>
+				<input type="button" id="edit" name="edit" class="formbutton" value="Editar" onclick="goToEditPage();" />
+				<input type="button" id="close" name="close" class="formbutton" value="Fechar pedido" onclick="closeRequest();"/>
+				<input type="button" id="cancel" name="cancel" class="formbutton" value="Cancelar pedido" onclick="cancelRequest();" />
+			</p>
+		</form>
+	</div>
+</div>
+</body>
+</html>

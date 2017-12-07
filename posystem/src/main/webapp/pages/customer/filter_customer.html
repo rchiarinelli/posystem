@@ -1,0 +1,185 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+	dojo.require("dojox.grid.cells.dijit");
+	dojo.require("dojox.data.CsvStore");
+	dojo.require("dojox.grid.DataGrid");
+	dojo.require("dijit.form.Button");
+	
+	var layout = [
+	              { field: 'name'   , name: 'Nome',width:'300px' }
+	             ];
+
+	
+	var grid = null;
+
+	function filterCustomers() {
+		var messagesBox = dojo.byId("messages");
+		messagesBox.style.display='none';
+		//Montar string json
+		var name = dojo.byId("name").value;
+		var cpfCnpj = dojo.byId("cnpj_cpf").value;
+
+		var hasArgs = '';
+		var jsonRequest ='{"customerFilter" :{';
+		if (name!=null && name!=''){
+			if (hasArgs){
+				jsonRequest += ',';
+			} else {
+				hasArgs=true;	
+			}
+			jsonRequest += '"customerName" : {"$":"'+name+'"}';
+			//console.log(hasArgs);
+		}
+		if (cpfCnpj!=null && cpfCnpj > 0){
+			if (hasArgs){
+				jsonRequest += ',';
+			} else {
+				hasArgs=true;	
+			}
+			jsonRequest += '"cpf_cnpj" : {"$":"'+cpfCnpj+'"}';
+			//console.log(hasArgs);
+			
+		}
+		jsonRequest += '}';		
+		jsonRequest += '}';
+
+		//Invocar servico e salvar
+		dojo.xhrPost({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/customer/filter",
+			postData: jsonRequest,
+               headers: {
+                   "Content-Type": "application/json"
+               },
+               handleAs: "text",
+               load: function(response,ioargs){
+					var jsonResponse = JSON.parse(response);
+					console.log(jsonResponse);
+					loadGrid(jsonResponse);
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao executar o filtro no servidor. Tente novamente mais tarde.\nErro:" + error);
+            }	         
+	     });	        
+	}
+
+	function loadGrid(response){
+        if (grid) {
+            grid.destroy();
+            grid = null;
+        }
+
+		var tempGrid = dijit.byId('filterCustomerGrid');
+		if (tempGrid!=null){
+			tempGrid.destroy();
+		}
+        
+		var jsonStore = new dojo.data.ItemFileReadStore({ data : response });
+		console.log(jsonStore);
+
+        var gotItems = function(items, request){
+            // alert("Total Count of Items in DataStore: " + items.length);
+            itemCount = items.length
+            //console.log('Total count of items in datastore..:' + itemCount);
+        };
+
+    	showMessages('O filtro retornou '+ response.items.length + ' resultado(s).');
+        if (response.items.length==0){
+        	dojo.byId("gridPanel").style.display='none';
+            return;
+        }
+        jsonStore.fetch({onComplete: gotItems});
+        //var sortKeys = [ {attribute: 'code', descending: false} ];
+        grid = new dojox.grid.DataGrid({
+            id: 'filterCustomerGrid', 
+            store: jsonStore, 
+            structure: layout,
+            errorMessage:'Ocorreu um erro durante a carga dos dados.',
+            selectionMode:'single',
+            clientSort:true
+          });
+
+        dojo.byId("gridPanel").style.display='block';
+		dojo.byId('gridNode').appendChild(grid.domNode);
+		grid.onFetchError = function(err, req) { console.log('Error..: '+err + '. Req..: ' + req.toString()); }
+		grid.startup();                             
+	}	
+
+	function viewCustomer(){
+		if (grid!=null && grid.selection.getSelected().length > 0){
+			var row = grid.selection.getSelected();
+			var custId = getSelectedCell('id',row);
+			dojo.setObject('customerId', custId);
+			console.debug(row);
+			console.debug(row[0].type[0]);
+			if (row[0].type[0]=='pj') {
+				openPage('mainContent','/pages/customer/view_customer_pj.html');
+			} else  if (row[0].type[0]=='pf'){
+				openPage('mainContent','/pages/customer/view_customer_pf.html');
+			} else {
+				showMessages('N&atilde;o foi poss&iacute;vel abrir a p&aacute;gina de exibi&ccedil;&atilde;o');				
+			}
+        }
+	}
+	
+	function editCustomer(){
+		if (grid!=null && grid.selection.getSelected().length>0) {
+			var row = grid.selection.getSelected();
+			var custId = getSelectedCell('id',row);
+			dojo.setObject('customerId', custId);
+			console.debug(row);
+			console.debug(row[0].type[0]);
+			if (row[0].type[0]=='pj') {
+				openPage('mainContent','/pages/customer/edit_customer_pj.html');
+			} else  if (row[0].type[0]=='pf'){
+				openPage('mainContent','/pages/customer/edit_customer_pf.html');
+			} else {
+				showMessages('N&atilde;o foi poss&iacute;vel abrir a p&aacute;gina de edi&ccedil%atilde;o');						
+			}
+
+		}
+	}
+	
+</script>
+</head>
+<body>
+<div id="wrap">
+	<div class="content">
+		<h3>Filtrar clientes</h3>
+
+		<div id="messages"></div>					
+		<form action="#" method="post" id="filterPOForm">
+			<p>
+				<label for="codes">Nome:</label><br />
+				<input type="text" name="name" id="name" size="15"/><br />
+			</p>
+
+			<p>
+				<label for="cnpj_cpf">CPF/CNPJ:</label><br />
+				<input type="text" name="cnpj_cpf" id="cnpj_cpf" size="15"/>
+			</p>						
+
+				
+			<p><input type="button" id="filter" name="filter" class="formbutton" value="Filtrar" onclick="filterCustomers();"/>
+			<input type="button" id="back" name="back" class="formbutton" value="Voltar" onclick="openPage('mainContent','/pages/customer/customer_home.html');"/></p>
+		</form>
+		<div id="gridPanel" style="display: none;">
+			<div id="gridNode" dojoType="dojox.grid.DataGrid" style="height:150px;"></div>
+			<br/>
+			<form action="#">
+				<p>
+				<input type="button" id="view" name="view" class="formbutton" value="Visualizar" onclick="viewCustomer();"/>
+				<input type="button" id="edit" name="edit" class="formbutton" value="Editar" onclick="editCustomer();"/>
+				</p>
+			</form>
+		</div>					
+	</div>
+</div>
+</body>
+</html>

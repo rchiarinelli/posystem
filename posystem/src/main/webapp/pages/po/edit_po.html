@@ -1,0 +1,279 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+    dojo.require("dijit.form.Form");
+    dojo.require("dijit.form.Button");
+    dojo.require("dijit.form.ValidationTextBox");
+    dojo.require("dijit.form.DateTextBox");
+    dojo.require("dijit.form.NumberTextBox");
+	
+	dojo.addOnLoad(function(){
+		if (checkURL()){
+			loadProperties();			
+		} else {
+			openPage('mainContent','/pages/po/filter_po.html');
+		}
+	});
+
+	function checkURL(){
+		var poId = dojo.getObject("poId");
+		if (poId==null || poId==''){
+			return false;
+		}
+		return true;			
+	}
+
+	
+	function loadProperties(){
+		loadComboCustomers();
+		loadPO();
+	}
+	
+	function loadComboCustomers(){
+		dojo.xhrGet({
+            url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/customer/list",
+            handleAs: "json",
+            load: function(data,args){
+	            // success: set heading, run function
+	          var cont;
+	          var value;
+	          var text;
+	          dojo.byId("customer").innerHTML += "<option value=\"-1\">---Selecione---</option>";
+	          if (data.customerList.items.length==null) {
+	        	  dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items.id.$ + "\">" + data.customerList.items.name.$ + "</option>";
+	          } else {
+				for(cont=0; cont < data.customerList.items.length; cont++){
+					dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items[cont].id.$ + "\">" + data.customerList.items[cont].name.$ + "</option>";
+				}            	
+	          }
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+	
+	function loadRequest(){
+		var cbCustomer = dojo.byId('customer');
+		if (cbCustomer.value!=null 
+				&& cbCustomer.value!=''
+					&& cbCustomer.value!='-1'){
+			dojo.xhrGet({
+				url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/get/openordersbycustomer/" + cbCustomer.value,
+	            handleAs: "json",
+	            load: function(data,args){
+					//console.log(data);
+		          	var cont;
+			        var value;
+			        var text;
+			        var cbRequest = dojo.byId("request");
+			        cbRequest.options.length=0;
+			        var option = dojo.create("option");
+			        option.value='-1';
+			        option.text='---Selecione---';
+			        cbRequest.add(option,null);
+			        for(cont=0; cont < data.length; cont++){
+				      	//console.log(data[cont]);
+				      	option = dojo.create("option");
+				        option.value=data[cont].request_add.requestId.$;
+				        option.text=data[cont].request_add.code.$;
+				      	cbRequest.add(option,null);
+			        } 
+	            },
+	            // if any error occurs, it goes here:
+	            error: function(error,args){
+	                showMessages("Ocorreu um erro durante a recuperação dos pedidos." + error);
+	            }
+	        });
+		} else if (cbCustomer.value!=null 
+				&& cbCustomer.value!=''
+					&& cbCustomer.value=='-1'){
+			dojo.byId("request").innerHTML ="";
+		}
+	}
+
+	function loadPO(){
+		var poId = dojo.getObject("poId");
+		console.debug("POID..:" + poId);
+		var url= dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/get/" + poId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                console.log(response);
+				if (response.poServiceResponse.status.$=='0'){
+	                dojo.html.set(dojo.byId("osNumber"), response.poServiceResponse.viewBean.poNumber.$,{	parseContent: true	});
+	                dojo.byId('customer').value=response.poServiceResponse.viewBean.customerId.$;
+	                dojo.byId('poId').value=response.poServiceResponse.viewBean.poId.$;
+	                var cbCustomer = dojo.byId('customer');
+	    			dojo.xhrGet({
+	    				url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/get/openordersbycustomer/" + cbCustomer.value,
+	    	            handleAs: "json",
+	    	            load: function(data,args){
+	    					console.log(data);
+	    		          	var cont;
+	    			        var value;
+	    			        var text;
+	    			        var cbRequest = dojo.byId("request");
+	    			        var option = dojo.create("option");
+	    			        option.value='-1';
+	    			        option.text='---Selecione---';
+	    			        cbRequest.add(option,null);
+	    			        for(cont=0; cont < data.length; cont++){
+	    				      	//console.log(data[cont]);
+	    				      	option = dojo.create("option");
+	    				        option.value=data[cont].request_add.requestId.$;
+	    				        option.text=data[cont].request_add.code.$;
+	    				        if (data[cont].request_add.requestId.$==response.poServiceResponse.viewBean.requestId.$){
+		    				        option.selected=true;
+	    				        }
+		    				    cbRequest.add(option,null);
+	    			        } 
+	    	            },
+	    	            // if any error occurs, it goes here:
+	    	            error: function(error,args){
+	    	                showMessages("Ocorreu um erro durante a recuperação dos pedidos." + error);
+	    	            }
+	    	        });
+					dojo.byId('dueDate').value=response.poServiceResponse.viewBean.dueDate.$;
+					dojo.byId('estTime').value=response.poServiceResponse.viewBean.estimatedTime.$;
+					dojo.byId('qtdPieces').value=response.poServiceResponse.viewBean.qtd.$;
+					dojo.byId('openDate').value=response.poServiceResponse.viewBean.openDate.$;
+					if (response.poServiceResponse.viewBean.sketchNumber!=null
+								&& response.poServiceResponse.viewBean.sketchNumber.$!=''){
+						dojo.byId('sketchNumber').value=response.poServiceResponse.viewBean.sketchNumber.$;
+					}
+				}else if (response.poServiceResponse.status.$=='1'){
+					showMessages(response.serviceResponse.message.$);
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });		
+	}
+	
+
+	function updatePO(){
+		dojo.byId("messages").style.display='none';
+		//Montar string json
+		var request = dojo.byId("request").value;
+		var dueDate = dojo.byId("dueDate").value;
+		var estimatedTime = dojo.byId("estTime").value;
+		var qtd = dojo.byId("qtdPieces").value;
+		var sketchNumber = dojo.byId("sketchNumber").value;
+		var poId = dojo.byId("poId").value;
+		var openDate = dojo.byId("openDate").value;
+		
+		var jsonRequest = '{"po_update" :{';
+		
+		if (poId!=''){
+			jsonRequest += '"poId": {"$" : "' + poId + '"}';
+		}
+		if (request!=''){
+			jsonRequest += ',"request": {"$" : "'+request+'"}';
+		}
+		if (dueDate!=''){
+			jsonRequest += ',"dueDate": {"$" : "'+dueDate+'"}';
+		}
+		if (estimatedTime!=''){
+			jsonRequest += ',"estimatedTime":{"$" : "'+estimatedTime+'"}';
+		}
+		if (qtd!=''){
+			jsonRequest += ',"qtd":{"$" : "'+qtd+'"}';
+		}
+		if (sketchNumber!=''){
+			jsonRequest += ',"sketchNumber":{"$" : "'+sketchNumber+'"}';
+		}
+		if (openDate!=''){
+			jsonRequest += ',"openDate":{"$" : "'+openDate+'"}';
+		}		
+		
+		jsonRequest += '}}';
+
+		//Invocar servico e salvar
+		dojo.xhrPost({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/update",
+			postData: jsonRequest,
+               headers: {
+                   "Content-Type": "application/json"
+               },
+               handleAs: "json",
+               load: function(data,ioargs){
+                   console.log(data);
+               	if (data.serviceResponse.status.$=='0'){
+               		openPage('mainContent','/pages/po/filter_po.html');
+               	}else if (data.serviceResponse.status.$=='1' ){
+               		showMessages(data.serviceResponse.message.$);
+               	} 
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\nErro:" + error);
+            }	         
+	     });		
+	}
+</script>
+</head>
+<body class="tundra">
+
+<div id="wrap">
+				<div class="content">
+					<h3>Ordem de servi&ccedil;o <span id="osNumber"></span></h3>
+					<div id="messages"></div>					
+					<form action="#" method="post" id="editPOForm">
+						<p>
+						<input type="hidden" id="poId" name="podId"/>
+						<label for="customer">Cliente:</label><span class="errorSign">*</span><br />
+						<select id="customer" name="customer" size="1" style="width: 288px" onchange="loadRequest();">
+						</select>
+						</p>
+
+						<p><label for="request">Pedido:</label><span class="errorSign">*</span><br />
+						<select id="request" name="request" size="1" style="width: 288px">
+						</select>
+						</p>
+
+						<p><label for="openDate">Data abertura:<br />
+						<input type="text" name="openDate" id="openDate" readonly="readonly"/><br /></p>
+
+
+						<p><label for="dueDate">Data estimada de entrega:</label><span class="errorSign">*</span><br />
+						<input type="text" name="dueDate" id="dueDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"/><br /></p>
+
+
+						<table>
+							<tr>
+								<td>
+
+									<p><label for="estTime">Tempo estimado(em horas):</label><span class="errorSign">*</span><br />
+										<input id="estTime" type="text" name="estTime" /><br />									
+									</p>
+								</td>
+								<td>
+									<p><label for="qtdPieces">Quantidade pe&ccedil;as:</label><span class="errorSign">*</span><br />
+									<input type="text" name="qtdPieces" id="qtdPieces" /><br /></p>
+								</td>
+							</tr>
+						</table>
+						<p><label for="sketchNumber">Desenho n&uacute;mero:</label><br />
+						<input type="text" name="sketchNumber" id="sketchNumber"/><br /><br/></p>
+						
+						<p><input type="button" id="save" name="save" class="formbutton" value="Salvar" onclick="updatePO();" />
+						<input type="button" id="cancel" name="cancel" class="formbutton" value="Cancelar" onclick="openPage('mainContent','/pages/po/filter_po.html');"/></p>
+					</form>
+				</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,403 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit");
+	dojo.require("dijit.form.Textarea");
+</script>
+<script type="text/javascript">
+	function checkURL(){
+		var customerId = dojo.getObject('customerId');
+		if (customerId==null || customerId==''){
+			return false;
+		}
+		return true;			
+	}
+
+	dojo.addOnLoad(function(){
+		$("#cnpj_cpf").mask("99.999.999/9999-99");	
+		if (checkURL()){
+			loadCustomer();			
+		} else {
+			openPage('mainContent','/pages/customer/customer_home.html');
+		}		
+	});
+
+	
+	function loadCustomer() {
+		var customerId = dojo.getObject('customerId');
+
+		var url= dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/pjcustomer/get/" + customerId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                console.log(response);
+                var viewBeanResponse = response.serviceResponse.viewBean;
+                
+				if (response.serviceResponse.status.$=='0'){
+					dojo.byId('customerId').value = viewBeanResponse.id.$;
+	                dojo.byId("name").value = viewBeanResponse.name.$;
+					
+	                if (viewBeanResponse.cnpjCgc!=null 
+	                		&& viewBeanResponse.cnpjCgc.$ != '') {
+		                dojo.byId("cnpj_cpf").value = viewBeanResponse.cnpjCgc.$;	                	
+	                }
+	                
+	                if (viewBeanResponse.details!=null
+							&& viewBeanResponse.details.$!=null) {
+		                dojo.byId('details').value=unescape(viewBeanResponse.details.$);						
+					}
+					//Addresses
+					if (viewBeanResponse.addresses!=null) {
+						var address = viewBeanResponse.addresses;
+						if (address.id != null && address.id!='') {
+							dojo.byId('addressId').value = address.id.$;							
+						}
+
+						if (address.street!=null && address.street!='') {
+							dojo.byId('street').value=  address.street.$;	
+						}
+						if (address.number!=null && address.number!=null) {
+							dojo.byId('number').value= address.number.$;	
+						}
+						if (address.complement!=null && address.complement!=null) {
+							dojo.byId('complement').value= address.complement.$;	
+						}
+						if (address.city!=null && address.city!='') {
+							dojo.byId('city').value= address.city.$;	
+						}
+						if (address.zipCode!=null && address.zipCode!=''){
+							dojo.byId('zipcode').value= address.zipCode.$;	
+						}
+						if (address.state!=null && address.state!='') {
+							dojo.byId('state').value= address.state.$;							
+						}
+					}
+					
+					//Contacts
+					if (viewBeanResponse.contacts!=null) {
+						var contact = viewBeanResponse.contacts;
+
+						if (contact.id!=null && contact.id!='') {
+							dojo.byId('contactId').value = contact.id.$;							
+						}
+						if (contact.email!=null && contact.email!='') {
+							dojo.byId('email').value= contact.email.$;
+						}
+						if (contact.officePhoneNumber!=null && contact.officePhoneNumber!='') {
+							dojo.byId('officePhoneNumber').value= contact.officePhoneNumber.$;							
+						}
+						if (contact.mobilePhoneNumber!=null && contact.mobilePhoneNumber!='') {
+							dojo.byId('mobilePhoneNumber').value= contact.mobilePhoneNumber.$;							
+						}
+					}
+					
+				}else if (response.serviceResponse.status.$=='1'){
+					showMessages(response.serviceResponse.message.$);
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+                showMessages(error);
+            }
+        });		
+	}
+	
+	function updateCustomer(){
+		dojo.byId("messages").style.display='none';
+		//Montar string json
+		var customerId = dojo.byId('customerId').value;
+		var addressId = dojo.byId('addressId').value;
+		var contactId = dojo.byId('contactId').value;
+		var name = dojo.byId("name").value;
+		var details = dojo.byId("details").value;
+		var cnpj = dojo.byId("cnpj_cpf").value;
+		
+		
+		
+		var street = dojo.byId('street').value;
+		var number = dojo.byId('number').value;
+		var complement = dojo.byId('complement').value;
+		var city = dojo.byId('city').value;
+		var zipCode = dojo.byId('zipcode').value;
+		var state = dojo.byId('state').value;
+		
+		var contactName = name; 
+		var email = dojo.byId('email').value;
+		var officePhoneNumber = dojo.byId('officePhoneNumber').value;
+		var mobilePhoneNumber = dojo.byId('mobilePhoneNumber').value;
+		
+		
+		var hasFields = false;
+		var hasAddress = false;
+		if ((street!=null && street!='')
+			|| (number!=null && number!='')
+			|| (complement!=null && complement!='')
+			|| (city!=null && city!='')
+			|| (zipCode!=null && zipCode!='')
+			|| (state!=null && state!='')){
+			hasAddress=true;
+		}
+		
+		var hasContactInfo=false;
+		if ((email!=null && email!='')
+			|| (officePhoneNumber!=null && officePhoneNumber!='')
+			|| (mobilePhoneNumber!=null && mobilePhoneNumber!='')) {
+			hasContactInfo=true;
+		}	
+
+		var jsonRequest = '{"updatePJCustomer":{';
+		jsonRequest += '"id": {"$" : "'+customerId+'"}';
+		hasFields = true;
+		if (name!=null && name!=''){
+			if (hasFields) {
+				jsonRequest += ',';	
+			} else {
+				hasFields = true;				
+			}
+			jsonRequest += '"name": {"$" : "'+name+'"}';
+		}
+		if (details!=null && details!=''){
+			if (hasFields) {
+				jsonRequest += ',';	
+			} else {
+				hasFields = true;				
+			}
+			jsonRequest += '"details": {$ : "'+escape(details)+'"}';
+			hasFields = true;
+		}
+		if (cnpj!=null && cnpj!=''){
+			if (hasFields) {
+				jsonRequest += ',';	
+			} else {
+				hasFields = true;				
+			}
+			jsonRequest += '"cnpjCgc": { $ : "'+cnpj+'"}';
+			hasFields = true;
+		}
+		
+		//Endereco
+		if (hasAddress) {
+			var jsonAddress = '"addresses":[{'
+
+			var hasItem = false;
+			if (addressId!=null && addressId!='') {
+				if (hasItem) {
+					jsonAddress+=',';
+				}
+				jsonAddress+='"id":{"$" :"'+addressId+'"}';
+				hasItem = true;
+			}
+			if (street!=null && street!=''){
+				if (hasItem) {
+					jsonAddress+=',';
+				}
+				jsonAddress+='"street":{"$" :"'+street+'"}';
+				hasItem=true;
+			}
+			if (number!=null && number!=''){
+				if (hasItem) {
+					jsonAddress+=',';
+				}
+				jsonAddress+='"number":{"$" :"'+number+'"}';
+				hasItem=true;
+			} 
+			if (complement!=null && complement!=''){
+				if (hasItem) {
+					jsonAddress+=',';
+				}
+				jsonAddress+='"complement":{"$" :"'+complement+'"}';
+				hasItem=true;
+			}
+			if (city!=null && city!=''){
+				if (hasItem) {
+					jsonAddress+=',';
+				}
+				jsonAddress+='"city":{"$" :"'+city+'"}';
+				hasItem=true;
+			}
+			if (zipCode!=null && zipCode!='') {
+				if (hasItem) {
+					jsonAddress+=',';
+				}
+				jsonAddress+='"zipCode":{"$" :"'+zipCode+'"}';
+				hasItem=true;
+			}
+			if (state!=null && state!='') {
+				if (hasItem) {
+					jsonAddress+=',';
+				}
+				jsonAddress+='"state":{"$" :"'+state+'"}';
+				hasItem=true;
+			}
+			jsonAddress+='}]';
+			if (hasFields) {
+				jsonRequest+=',';				
+			}
+			jsonRequest+=jsonAddress;
+			
+		}
+		
+		//Contanto
+		if (hasContactInfo) {
+			var hasItem = false;
+			var jsonContact = '"contacts":[{';
+			if (contactId!=null && contactId!='') {
+				if (hasItem) {
+					jsonContact+=',';
+				}
+				jsonContact += '"id":{"$":"'+contactId+'"}';
+				hasItem = true
+			}
+			if (contactName!=null && contactName!='') {
+				if (hasItem) {
+					jsonContact+=',';
+				}
+				jsonContact+='"name":{"$" :"'+contactName+'"}';
+				hasItem=true;
+			}
+			if (email!=null && email!='') {
+				if (hasItem) {
+					jsonContact+=',';
+				}
+				jsonContact+='"email":{"$" :"'+email+'"}';
+				hasItem=true;
+			}
+			if (officePhoneNumber!=null && officePhoneNumber!='') {
+				if (hasItem) {
+					jsonContact+=',';
+				}
+				jsonContact+='"officePhoneNumber":{"$" :"'+officePhoneNumber+'"}';
+				hasItem=true;
+			}
+			if (mobilePhoneNumber!=null && mobilePhoneNumber!='') {
+				if (hasItem) {
+					jsonContact+=',';
+				}
+				jsonContact+='"mobilePhoneNumber":{"$" :"'+mobilePhoneNumber+'"}';
+				hasItem=true;
+			}
+			if (hasItem) {
+				jsonContact+=',';
+			}
+			jsonContact+='"status":{"$" :"1"}';
+			jsonContact+='}]';
+			
+			if (hasFields) {
+				jsonRequest+=',';				
+			}
+			jsonRequest+=jsonContact;			
+		}
+		
+		jsonRequest += '}}';
+		console.log(jsonRequest);
+		//Invocar servico e salvar
+		dojo.xhrPost({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/pjcustomer/update",
+			postData: jsonRequest,
+               headers: {
+                   "Content-Type": "application/json"
+               },
+               handleAs: "json",
+               load: function(data,ioargs){
+                   console.log(data);
+               	if (data.serviceResponse.status.$=='0'){
+                   	openPage('mainContent','/pages/customer/customer_home.html');
+               	}else if (data.serviceResponse.status.$=='1' ){
+               		showMessages(data.serviceResponse.message.$);
+               	} 
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\nErro:" + error);
+            }	         
+	     });	
+	}
+	
+</script>
+</head>
+<body>
+<div id="wrap">
+	<div class="content">
+	<h3>Alterar dados de cliente pessoa f&iacute;sica</h3>
+	<div id="messages"></div>
+		<br/>
+		<form action="#" method="post" id="addCustomerForm">
+			<p>
+				<input type="hidden" id="customerId" name="customerId" />
+				<input type="hidden" id="contactId" name="contactId" />
+				<input type="hidden" id="addressId" name="addressId" />
+			</p>
+			<p>
+				<span class="errorSign">*</span> <label for="name">Nome:</label>
+				<input type="text" name="name" id="name" size="20" maxlength="30"/>
+			</p>
+			<p>
+				<span class="errorSign">*</span> <label for="cnpj_cpf">CNPJ:</label>
+				<input id="cnpj_cpf" name="cnpj_cpf" type="text" size="20" maxlength="18"/>				
+			</p>
+			<p>
+				<label for="details">Informa&ccedil;&otilde;es:</label><br />
+				 <textarea id="details" name="details" 
+				 dojoType="dijit.form.Textarea"
+				 cols="50"
+				 rows="20"
+				 style="height: 100px;" 
+					maxLength="999"
+				 title="Dados gerais. Aceita mais de uma linha.">
+				 </textarea>	
+			</p>						
+            <p>
+            	<label for="street">Rua:</label>
+            	<input id="street" type="text" name="street" maxlength="60" />
+            </p>
+            <p>
+            	<label for="number">N&uacute;mero:</label>
+            	<input id="number" type="text" name="number" maxlength="5" />
+            </p>
+            <p>
+            	<label for="complement">Complemento:</label>
+            	<input id="complement" type="text" name="complement" maxlength="45" />
+            </p>
+            <p>
+            	<label for="city">Cidade:</label>
+            	<input id="city" type="text" name="city" maxlength="45" />
+            </p>
+            <p>
+            	<label for="zipcode">CEP:</label>
+            	<input id="zipcode" type="text" name="zipCode" maxlength="15" />
+            </p>
+            <p>
+            	<label for="state">Estado:</label>
+            	<select id="state" name="state">
+            		<option id="sp">SP</option>
+            	</select>
+            </p>
+            <p>
+            	<label for="email">Email:</label>
+            	<input id="email" type="text" name="email" maxlength="45" />
+            </p>
+            <p>
+            	<label for=officePhoneNumber>Telefone:</label>
+            	<input id="officePhoneNumber" type="text" name="officePhoneNumber" maxlength="20" />
+            </p>
+            <p>
+            	<label for="mobilePhoneNumber">Celular:</label>
+            	<input id="mobilePhoneNumber" type="text" name="mobilePhoneNumber" maxlength="20" />
+            </p>
+			<p>
+				<input type="button" id="save" name="save" class="formbutton" value="Salvar" onclick="updateCustomer();"/>
+				<input type="button" id="back" name="back" class="formbutton" value="Voltar" onclick="openPage('mainContent','/pages/customer/customer_home.html');"/>
+			</p>
+		</form>
+		</div>
+		</div>        
+</body>
+
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.form.Textarea");
+
+	dojo.addOnLoad(function(){
+		if (checkURL()){
+			loadCustomer();			
+		} else {
+			openPage('mainContent','/pages/customer/filter_customer.html');
+		}
+	});
+
+	function checkURL(){
+		var requestId = dojo.getObject('customerId');
+		if (requestId==null || requestId==''){
+			return false;
+		}
+		return true;			
+	}
+	
+	function loadCustomer() {
+		var customerId = dojo.getObject('customerId');
+
+		var url=dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/pjcustomer/get/" + customerId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                console.log(response);
+                var viewBeanResponse = response.serviceResponse.viewBean;
+                
+				if (response.serviceResponse.status.$=='0'){
+					
+	                dojo.html.set(dojo.byId("name"), viewBeanResponse.name.$,{	parseContent: true	});
+	                	                
+	                dojo.html.set(dojo.byId("cnpj"), viewBeanResponse.cnpjCgc.$,{	parseContent: true	});
+	                
+					if (viewBeanResponse.details!=null
+							&& viewBeanResponse.details.$!=null) {
+		                dojo.byId('details').value=unescape(viewBeanResponse.details.$);						
+					}
+					//Addresses
+					if (viewBeanResponse.addresses!=null) {
+						var address = viewBeanResponse.addresses;
+						if (address.street!=null && address.street!='') {
+							dojo.html.set(dojo.byId('street'), address.street.$,{parseContent:true});	
+						}
+						if (address.number!=null && address.number!=null) {
+							dojo.html.set(dojo.byId('number'), address.number.$,{parseContent:true});	
+						}
+						if (address.complement!=null && address.complement!=null) {
+							dojo.html.set(dojo.byId('complement'), address.complement.$,{parseContent:true});	
+						}
+						if (address.city!=null && address.city!='') {
+							dojo.html.set(dojo.byId('city'), address.city.$,{parseContent:true});	
+						}
+						if (address.cep!=null && address.cep!=''){
+							dojo.html.set(dojo.byId('cep'), address.cep.$,{parseContent:true});	
+						}
+						if (address.state!=null && address.state!='') {
+							dojo.html.set(dojo.byId('state'), address.state.$,{parseContent:true});							
+						}
+					}
+					
+					//Contacts
+					if (viewBeanResponse.contacts!=null) {
+						var contact = viewBeanResponse.contacts;
+						if (contact.email!=null && contact.email!='') {
+							dojo.html.set(dojo.byId('email'), contact.email.$,{parseContent:true});
+						}
+						if (contact.officePhoneNumber!=null && contact.officePhoneNumber!='') {
+							dojo.html.set(dojo.byId('officePhoneNumber'), contact.officePhoneNumber.$,{parseContent:true});							
+						}
+						if (contact.mobilePhoneNumber!=null && contact.mobilePhoneNumber!='') {
+							dojo.html.set(dojo.byId('mobilePhoneNumber'), contact.mobilePhoneNumber.$,{parseContent:true});							
+						}
+					}
+					
+				}else if (response.serviceResponse.status.$=='1'){
+					showMessages(response.serviceResponse.message.$);
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });		
+	}
+
+	
+	
+	function removeCustomer() {
+		var customerId = dojo.getObject('customerId');
+		//Montar string json
+
+		var jsonRequest = '{"customer":{'; 
+		if (customerId!=null && customerId!=''){
+			jsonRequest += '"id": {"$" : "'+customerId+'"}';
+		}
+		jsonRequest += '}}';
+		console.log(jsonRequest);		
+		
+		//Invocar servico e salvar
+		dojo.xhrPost({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/customer/delete",
+			postData: jsonRequest,
+               headers: {
+                   "Content-Type": "application/json"
+               },
+               handleAs: "json",
+               load: function(data,ioargs){
+                console.log(data);
+               	if (data.serviceResponse.status.$=='0'){
+                   	openPage('mainContent','/pages/customer/filter_customer.html');
+               	}else if (data.serviceResponse.status.$=='1' ){
+               		showMessages(data.serviceResponse.message.$);
+               	} 
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\nErro:" + error);
+            }	         
+	     });		
+		
+	}
+	
+</script>
+</head>
+<body>
+<div id="wrap">
+	<div class="content">
+		<h3>Apagar usu&aacute;rio</h3>
+		<br/>
+		<div id="messages" style="display: block;">Voc&ecirc; tem certeza que remover o seguinte usu&aacute;rio?</div>					
+		<form action="#" method"post" id="viewCustomerForm">
+			<p>
+				<br/>
+				<label for="name">Nome:</label>
+				<span id="name"></span>
+			</p>
+			<p>
+				<label for="cnpj">CNPJ:</label>
+				<span id="cnpj"></span>
+			</p>
+			<p>
+				<label for="details">Informa&ccedil;&otilde;es:</label><br />
+				<textarea id="details" name="details" dojoType="dijit.form.Textarea"
+					 cols="50"
+					 rows="20"
+					 style="height: 100px;" 
+					 maxLength="999"
+					 title="Dados gerais. Aceita mais de uma linha." readonly="readonly"></textarea>	
+			</p>						
+            <p>
+            	<label for="street">Rua:</label>
+				<span id="street"></span>
+            </p>
+            <p>
+            	<label for="number">N&uacute;mero:</label>
+            	<span id="number"></span>
+            </p>
+            <p>
+            	<label for="complement">Complemento:</label>
+            	<span id="complement"></span>
+            </p>
+            <p>
+            	<label for="city">Cidade:</label>
+            	<span id="city"></span>
+            </p>
+            <p>
+            	<label for="zipcode">CEP:</label>
+            	<span id="zipcode"></span>
+            </p>
+            <p>
+            	<label for="state">Estado:</label>
+            	<span id="state"></span>
+            </p>
+            <p>
+            	<label for="email">Email:</label>
+            	<span id="email"></span>
+            </p>
+            <p>
+            	<label for=officePhoneNumber>Telefone:</label>
+            	<span id="officePhoneNumber"></span>
+            </p>
+            <p>
+            	<label for="mobilePhoneNumber">Celular:</label>
+            	<span id="mobilePhoneNumber"></span>
+            </p>
+
+			<p>
+				<input type="button" id="delete" name="delete" class="formbutton" value="Apagar" onclick="removeCustomer();"/>
+				<input type="button" id="back" name="back" class="formbutton" value="Voltar" onclick="openPage('mainContent','/pages/customer/filter_customer.html');"/>				
+			</p>
+		</form>
+
+	</div>
+</div>
+</body>
+</html>

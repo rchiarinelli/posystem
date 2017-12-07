@@ -1,0 +1,208 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+    dojo.require("dijit.form.Form");
+    dojo.require("dijit.form.Button");
+    dojo.require("dijit.form.ValidationTextBox");
+    dojo.require("dijit.form.DateTextBox");
+	
+	dojo.addOnLoad(function(){
+		loadProperties();
+	});
+
+	
+	function loadProperties(){
+		loadComboCustomers();
+		loadCurrentDate();
+		loadPOCode();
+	}
+	
+	function loadComboCustomers(){
+		dojo.xhrGet({
+            url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/customer/list",
+            handleAs: "json",
+            load: function(data,args){
+	            // success: set heading, run function
+	          var cont;
+	          var value;
+	          var text;
+	          dojo.byId("customer").innerHTML += "<option value=\"-1\">---Selecione---</option>";
+	          if (data.customerList.items.length==null) {
+	        	  dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items.id.$ + "\">" + data.customerList.items.name.$ + "</option>";
+	          } else {
+				for(cont=0; cont < data.customerList.items.length; cont++){
+					dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items[cont].id.$ + "\">" + data.customerList.items[cont].name.$ + "</option>";
+				}            	
+	          }
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("Erro ao listar clientes.",error);
+            }
+        });
+	}
+
+	function loadPOCode(){
+		dojo.xhrGet({
+            url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/orderCode",
+            handleAs: "json",
+            load: function(data,args){
+	            // success: set heading, run function
+	          var cont;
+	          var value;
+	          var text;
+	          console.dir(data);
+	          dojo.byId("poCode").value = data.requestCode.value.$;
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+            	showMessages("Erro ao ler recurso no servidor. Tente novamente mais tarde.\nErro:" + error);
+            }
+        });		
+	}
+	
+	function loadCurrentDate(){
+		dojo.xhrGet({
+            url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/utilities/current_server_date",
+            handleAs: "json",
+            load: function(data,args){
+	            // success: set heading, run function
+	          var cont;
+	          var value;
+	          var text;
+	          console.dir(data.utility.value);
+	          dojo.byId("openDate").value = data.utility.value.$;
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });		
+	}
+
+	function saveRequest(){
+		dojo.byId("messages").style.display='none';
+		//Montar string json
+		var customer = dojo.byId("customer").value;
+		var description = dojo.byId("description").value;
+		var price = dojo.byId("price").value;
+		var qtd = dojo.byId("qtd").value;
+		var code = dojo.byId("poCode").value;
+		var openDate = dojo.byId("openDate").value;
+		var deliverDate = dojo.byId("deliverDate").value;
+
+		var jsonRequest = '{"add_request" :{"status": {"$" :  "Aberto"}'; 
+		if (customer!='-1'){
+			jsonRequest += ',"customer": {"$" : "'+customer+'"}';
+		}
+		if (description!=''){
+			jsonRequest += ',"description": {"$" : "'+escape(description)+'"}';
+		}
+		if (price!=''){
+			jsonRequest += ',"price": {"$" : "'+price+'"}';
+		}
+		if (qtd!=''){
+			jsonRequest += ',"qtd":{"$" : "'+qtd+'"}';
+		}
+		if (code!=''){
+			jsonRequest += ',"code":{"$" : "'+code+'"}';
+		}
+		if (openDate!=''){
+			jsonRequest += ',"openDate":{"$" : "'+openDate+'"}';
+		}
+		if (deliverDate!=''){
+			jsonRequest += ',"deliverDate":{"$" : "'+deliverDate+'"}';
+		}
+		jsonRequest += '}}';
+
+		//Invocar servico e salvar
+		dojo.xhrPost({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/add",
+			postData: jsonRequest,
+               headers: {
+                   "Content-Type": "application/json"
+               },
+               handleAs: "json",
+               load: function(data,ioargs){
+                   console.log(data);
+               	if (data.serviceResponse.status.$=='0'){
+                   	openPage('mainContent','/pages/order/order_home.html');
+               	}else if (data.serviceResponse.status.$=='1' ){
+               		showMessages(data.serviceResponse.message.$);
+               	} 
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\nErro:" + error);
+            }	         
+	     });	        
+	}
+
+	function showMessages(msg){
+		//messagesBox.innerHtml=msg;
+		//messagesBox.textContent=msg;
+		dojo.byId("messages").style.display='block';		
+		console.log(msg);
+	  	dojo.html.set(dojo.byId("messages"), msg, 
+	  		  		{
+			      		parseContent: true
+			      	});
+	}
+
+	function redirectPage(url){
+		location.href=url;
+	}	
+</script>
+</head>
+<body class="tundra">
+
+<div id="wrap">
+	<div class="content">
+		<h3>Novo pedido</h3>
+		<div id="messages"></div>
+		
+		<form id="addRequestForm">
+
+			<p><label for="customer">Cliente:</label><span class="errorSign">*</span><br />
+				<select id="customer" name="customer" size="1" style="width: 288px">
+				</select>
+			</p>
+
+			<p><label for="poCode">C&oacute;digo do pedido:</label><br />
+			<input type="text" name="poCode" id="poCode" readonly="readonly" /></p>
+
+			<p><label for="openDate">Data abertura:</label><br />
+			<input type="text" name="openDate" id="openDate" readonly="readonly" /></p>
+						
+			<p><label for="description">Descri&ccedil;&atilde;o:</label><span class="errorSign">*</span><br />
+				<textarea id="description" name="description" rows="5" cols="50"></textarea>
+			</p>
+			<p><label for="deliverDate">Data de entrega:</label><br />
+				<input type="text" name="deliverDate" id="deliverDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"/>
+			</p>						
+			<table>
+				<tr>
+					<td>
+						<p><label for="qtd">Quantidade:</label><span class="errorSign">*</span><br />
+						<input type="text" name="qtd" id="qtd"/></p>
+					</td>
+					<td>
+						<p><label for="price">Pre&ccedil;o:</label><br />
+						<input type="text" name="price" id="price"/></p>
+					</td>
+				</tr>
+			</table>
+			<p>
+				<input type="button" id="save" name="save" class="formbutton" value="Salvar" onclick="saveRequest()"/>
+				<input type="button" id="cancel" name="cancel" class="formbutton" value="Cancelar" onclick="openPage('mainContent','/pages/order/order_home.html');"/>
+			</p>
+		</form>
+	</div>
+</div>
+</body>
+</html>

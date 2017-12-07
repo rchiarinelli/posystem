@@ -1,0 +1,332 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+  	dojo.require("dojox.grid.cells.dijit");
+    dojo.require("dojox.data.CsvStore");
+    dojo.require("dojox.grid.DataGrid");
+    dojo.require("dijit.form.Button");
+
+    var layout = [
+                  { field: 'code'   , name: 'C&oacute;digo'  }
+                  ,{ field: 'customer'  , name: 'Cliente'}
+                  ,{ field: 'qtd'      , name: 'Quantidade'}
+                  ,{ field: 'price'   , name: 'Pre&ccedil;o' }
+                  ,{ field: 'deliverDate'   , name: 'Data entrega' }
+                  ,{ field: 'status'   , name: 'Status' }
+                 ];
+
+    var grid = null;
+    
+	dojo.addOnLoad(function(){
+		loadProperties();
+		console.log(dojo.moduleUrl);
+	});
+
+	
+	function loadProperties(){
+		loadComboCustomers();
+		loadComboStatus();
+	}
+	function loadComboCustomers(){
+		dojo.xhrGet({
+            url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/customer/list",
+            handleAs: "json",
+            load: function(data,args){
+	            // success: set heading, run function
+	          var cont;
+	          var value;
+	          var text;
+	          console.dir(data);
+	          dojo.byId("customer").innerHTML += "<option value=\"-1\">---Selecione---</option>";
+	          if (data.customerList.items.length==null) {
+	        	  dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items.id.$ + "\">" + data.customerList.items.name.$ + "</option>";
+	          } else {
+				for(cont=0; cont < data.customerList.items.length; cont++){
+					dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items[cont].id.$ + "\">" + data.customerList.items[cont].name.$ + "</option>";
+				}            	
+	          }           	
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+
+	function loadComboStatus(){
+		dojo.xhrGet({
+            url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/get/statusvalues",
+            handleAs: "json",
+            load: function(data,args){
+	            // success: set heading, run function
+	          var cont;
+	          var value;
+	          var text;
+	          console.log(data);
+	          dojo.byId("status").innerHTML += "<option value=\"-1\">---Selecione---</option>";
+	          for(cont=0; cont < data.length; cont++){
+          	  	dojo.byId("status").innerHTML += "<option value=\"" + data[cont].keyValueBean.value.$ + "\">" + data[cont].keyValueBean.text.$ + "</option>";
+	          }            	
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+
+	function filterData(){
+		var messagesBox = dojo.byId("messages");
+		messagesBox.style.display='none';
+		//Montar string json
+		var customer = dojo.byId("customer").value;
+		var poCodes = dojo.byId("poCodes").value;
+		var description = dojo.byId("description").value;
+		var fromDate = dojo.byId("fromOpenDate").value;
+		var toDate = dojo.byId("toOpenDate").value;
+		var status = dojo.byId("status").value;
+		var fromDeliverDate = dojo.byId("fromDeliverDate").value;
+		var toDeliverDate = dojo.byId("toDeliverDate").value;
+
+		var hasArgs = '';
+		var jsonRequest ='{"requestFilter" :{';
+		if (customer!=null && customer!='' && customer!='-1'){
+			jsonRequest += '"customer" : {"$":"'+customer+'"}';
+			hasArgs=true;
+		}
+		if (poCodes!=null && poCodes!=''){
+			if (hasArgs){
+				jsonRequest += ',';
+			} else {
+				hasArg=true;	
+			}
+			jsonRequest += '"orderCodes" : {"$":"'+poCodes+'"}';
+		}
+		if (description!=null && description!=''){
+			if (hasArgs){
+				jsonRequest += ',';
+			} else {
+				hasArg=true;	
+			}
+			jsonRequest += '"description" : {"$":"'+description+'"}';
+		}
+		if ((fromDate!=null && fromDate!='')
+				&& (toDate!=null && toDate!='')){
+			if (hasArgs){
+				jsonRequest += ',';
+			} else {
+				hasArg=true;	
+			}
+  			jsonRequest += '"openDateRange" : '; 
+  			jsonRequest += '[ ';
+  			jsonRequest += '{"$":"'+fromDate+'"}';
+  			jsonRequest += ',{"$":"'+toDate+'"}';
+  			jsonRequest += ']';
+		}
+		if ((fromDeliverDate!=null && fromDeliverDate!='')
+				&& (toDeliverDate!=null && toDeliverDate!='')){
+			if (hasArgs){
+				jsonRequest += ',';
+			} else {
+				hasArg=true;	
+			}
+  			jsonRequest += '"deliverDateRange" : '; 
+  			jsonRequest += '[ ';
+  			jsonRequest += '{"$":"'+fromDeliverDate+'"}';
+  			jsonRequest += ',{"$":"'+toDeliverDate+'"}';
+  			jsonRequest += ']';
+		}
+		if (status!=null && status!='-1'){
+			if (hasArgs){
+				jsonRequest += ',';
+			} else {
+				hasArg=true;	
+			}
+			jsonRequest += '"status" : {"$":"'+status+'"}';
+		}
+		jsonRequest += '}';		
+		jsonRequest += '}';
+
+		//Invocar servico e salvar
+		dojo.xhrPost({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/filter",
+			postData: jsonRequest,
+               headers: {
+                   "Content-Type": "application/json"
+               },
+               handleAs: "text",
+               load: function(response,ioargs){
+					//montar grid
+					//var jsonWrapper = JSON.parse('(' + response + ')', function (key, value) {
+					//    return value;
+					//});
+					var jsonResponse = JSON.parse(response);
+					console.log(jsonResponse);
+					loadGrid(jsonResponse);
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\n:" + error);
+            }	         
+	     });	        
+		
+	}
+
+	function loadGrid(response){
+        if (grid) {
+        	console.log('Destroying grid.');
+            grid.destroy();
+            grid = null;
+        }
+        var tempGrid = dijit.byId('filterRequestGrid');
+		if (tempGrid!=null){
+			console.warn('filterRequestGrid already exists on DOM Tree.Destroying the the existing one');
+			tempGrid.destroy();
+			tempGrid = null;
+		}
+        
+		showMessages('O filtro retornou '+ response.items.length + ' resultado(s).');
+		var jsonStore = new dojo.data.ItemFileReadStore({ data : response });
+		console.log(jsonStore);
+
+        var gotItems = function(items, request){
+            // alert("Total Count of Items in DataStore: " + items.length);
+            itemCount = items.length
+            console.log('Total count of items in datastore..:' + itemCount);
+        };
+        console.log('Checking items on response.');
+        if (response.items.length==0){
+        	dojo.byId("gridPanel").style.display='none';
+            return;
+        }
+        console.log('Fetching items on datastore.');
+        jsonStore.fetch({onComplete: gotItems});
+        //var sortKeys = [ {attribute: 'code', descending: false} ];
+        console.log('Instatiating new DataGrid.');
+        grid = new dojox.grid.DataGrid({
+            id: 'filterRequestGrid', 
+            store: jsonStore, 
+            autoHeight: 'yes', 
+            //sort: sortKeys,
+            structure: layout,
+            errorMessage:'Ocorreu um erro durante a carga dos dados.',
+            selectionMode:'single',
+            clientSort:true
+          });
+		console.log('Building grid.');
+        dojo.byId("gridPanel").style.display='block';
+		dojo.byId('gridNode').appendChild(grid.domNode);
+		grid.onFetchError = function(err, req) { console.log('Error..: '+err + '. Req..: ' + req.toString()); }
+		grid.startup();                             
+	}
+
+	function redirectPage(url){
+		location.href=url;
+	}
+
+	function viewRequest(){
+		if (grid!=null && grid.selection.getSelected().length > 0){
+			var items = grid.selection.getSelected();
+			var reqId = getSelectedCell('requestId',items);
+			dojo.setObject('requestId', reqId);
+			openPage('mainContent','/pages/order/view_order.html');
+        }
+	}
+	function editRequest(){
+		if (grid!=null && grid.selection.getSelected().length > 0){
+			var items = grid.selection.getSelected();
+			var reqId = getSelectedCell('requestId',items);
+			dojo.setObject('requestId', reqId);
+			openPage('mainContent','/pages/order/edit_order.html');
+        }
+	}
+	
+</script>
+</head>
+<body class="tundra">
+
+<div id="wrap">
+	<div class="content">
+		<h3>Filtro de pedidos</h3>
+		<div id="messages"></div>					
+		<form action="#">
+			<p>
+				<label for="customer">Cliente:</label><br />
+				<select id="customer" name="customer" size="1" style="width: 288px">
+				</select>
+			</p>
+			<p>
+				<label for="poCodes">Codigo(s):</label><br />
+				<input type="text" name="poCodes" id="poCodes" size="50" maxlength="255"/>
+			</p>
+			<p>
+				<label for="status">Status:</label><br />
+				<select id="status" name="status" size="1" style="width: 150px">
+				</select>
+			</p>
+			<table>
+				<tr>
+					<td colspan="2">
+						Data de entrega:
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<label for="fromDeliverDate">De:</label>
+						<input type="text" name="fromDeliverDate" id="fromDeliverDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"></input>								
+					</td>
+					<td>
+						<label for="toDeliverDate">At&eacute;:</label>
+						<input type="text" name="toDeliverDate" id="toDeliverDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"></input>				
+					</td>
+				</tr>
+			</table>
+			
+			<table>
+				<tr>
+					<td colspan="2">
+						Data de abertura:
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<label for="fromOpenDate">De:</label>
+						<input type="text" name="fromOpenDate" id="fromOpenDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"></input>								
+					</td>
+					<td>
+						<label for="toOpenDate">At&eacute;:</label>
+						<input type="text" name="toOpenDate" id="toOpenDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"></input>				
+					</td>
+				</tr>
+			</table>
+			<p><label for="description">Descri&ccedil;&atilde;o:</label><br />
+				<textarea id="description" name="description" rows="3" cols="50"></textarea>
+			</p>
+			<p>
+			<br/>
+			<input type="button" id="filter" name="filter" class="formbutton" value="Filtrar"  onclick="filterData()"/>
+			<input type="button" id="back" name="back" class="formbutton" value="Voltar"  onclick="openPage('mainContent','/pages/order/order_home.html')"/>
+			</p>
+		</form>
+		<div id="gridPanel" style="display: none;">
+			<div id="gridNode" dojoType="dojox.grid.DataGrid" style="height:150px;"></div>
+			
+			<br/>
+			<form action="#">
+				<p>
+				<input type="button" id="view" name="view" class="formbutton" value="Visualizar" onclick="viewRequest();"/>
+				<input type="button" id="edit" name="edit" class="formbutton" value="Editar" onclick="editRequest();"/>
+				</p>
+			</form>
+			
+		</div>
+	</div>
+</div>
+</body>
+</html>

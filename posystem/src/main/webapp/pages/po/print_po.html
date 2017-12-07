@@ -1,0 +1,228 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<script type="text/javascript" src="/posystem/js/dojo/dojo.js" charset="utf-8" djConfig="parseOnLoad:true"></script>
+<script type="text/javascript" src="/posystem/js/json/json2.js"></script>
+<script type="text/javascript" src="/posystem/pages/scripts/po_scripts.js"></script>
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+	dojo.require("dijit.form.Form");
+	dojo.require("dijit.form.Button");
+	dojo.require("dijit.form.ValidationTextBox");
+	dojo.require("dijit.form.DateTextBox");
+	dojo.require("dijit.form.NumberTextBox");
+	dojo.require("dijit.Tooltip");
+	dojo.addOnLoad(function(){
+		if (checkURL()){
+			loadProperties();			
+		}
+	});
+
+	function checkURL(){
+		var query = location.search;
+		var poId = getReqParam("poId");
+		if (poId==null || poId==''){
+			return false;
+		}
+		return true;			
+	}
+
+
+	function loadProperties(){
+		loadPO();
+	}
+
+	function loadPO(){
+		var poId = getReqParam("poId");
+		var subscriber = getReqParam("subscriberId");
+		var basepath = getReqParam("basePath");
+		var url= basepath[1]+ "/services/"+subscriber[1]+"/po/get/" + poId[1];
+//		console.log(url);
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                ///console.log(response);
+				if (response.poServiceResponse.status.$=='0'){
+	                dojo.html.set(dojo.byId("osNumber"), response.poServiceResponse.viewBean.poNumber.$,{	parseContent: true	});
+	                dojo.byId('customer').value=response.poServiceResponse.viewBean.customer.$;
+	                dojo.byId('request').value=response.poServiceResponse.viewBean.request.$;
+
+	        		var url= basepath[1]+ "/services/"+subscriber[1]+"/order/get/" + response.poServiceResponse.viewBean.requestId.$;
+	        		dojo.xhrGet({
+	                    url: url,
+	                    headers: {
+	                        "Content-Type": "text/plain"
+	                    },
+	                    handleAs: "json",
+	                    load: function(data,args){
+	                    	console.log('Value returned ' + data);
+	        				if (data.serviceResponse.status.$=='0'){
+	        	                var descReq = 'Descrição: ';
+	        	                descReq+=unescape(data.serviceResponse.viewBeanResponse.description.$);
+	        	                new dijit.Tooltip({
+	        	                    connectId: ["request"],
+	        	                    label: descReq
+	        	                });
+	        				}
+	                    },
+	                    // if any error occurs, it goes here:
+	                    error: function(error,args){
+	                        console.warn("error!",error);
+	                    }
+	                });
+	                
+					dojo.byId('dueDate').value=response.poServiceResponse.viewBean.dueDate.$;
+					dojo.byId('estTime').value=response.poServiceResponse.viewBean.estimatedTime.$;
+					dojo.byId('qtdPieces').value=response.poServiceResponse.viewBean.qtd.$;
+					if (response.poServiceResponse.viewBean.sketchNumber!=null
+								&& response.poServiceResponse.viewBean.sketchNumber.$!=''){
+						dojo.byId('sketchNumber').value=response.poServiceResponse.viewBean.sketchNumber.$;
+					}
+				}else if (response.poServiceResponse.status.$=='1'){
+					showMessages(response.serviceResponse.message.$);
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });		
+	}
+</script>
+<title>RIAN-Sistema de controle de ordens de serviço</title>
+<link rel="stylesheet" href="/posystem/pages/print_styles.css" type="text/css" />
+</head>
+<body class="tundra">
+<div id="messages"></div>
+<div>
+	<div>
+		<div >
+			<div>
+				<div>
+					<h3>RIAN</h3>
+					<h3>Ordem de serviço <span id="osNumber"></span></h3>
+					<form action="#" method="post" id="addPOForm">
+						<p><label for="customer">Cliente:</label>&nbsp;
+							<input type="text" name="customer" id="customer" readonly="readonly" />
+						</p>
+						<p><label for="request">Pedido:</label>&nbsp;
+							<input type="text" name="request" id="request" readonly="readonly" />						
+						</p>
+
+						<p><label for="dueDate">Data estimada de entrega:&nbsp;
+						<input type="text" name="dueDate" id="dueDate" readonly="readonly"/>&nbsp;
+						</p>
+
+
+						<table>
+							<tr>
+								<td>
+
+									<p><label for="estTime">Tempo estimado(em horas):</label>&nbsp;
+										<input id="estTime" type="text" name="estTime" 
+											readonly="readonly"/><br />									
+									</p>
+
+									
+								</td>
+								<td>
+
+									<p><label for="qtdPieces">Quantidade pe&ccedil;as:</label>&nbsp;
+									<input type="text" name="qtdPieces" id="qtdPieces" readonly="readonly"/></p>
+
+								
+								</td>
+							</tr>
+							
+						</table>
+						<p><label for="sketchNumber">Desenho n&uacute;mero:</label><br />
+						<input type="text" name="sketchNumber" id="sketchNumber" readonly="readonly"/><br/></p>
+						<table>
+							<tr>
+								<td>Data</td>
+								<td>In&iacute;cio</td>
+								<td>T&eacute;rmino</td>
+								<td>Operador</td>
+								<td>Maquina</td>
+								<td>Coment&aacute;rio</td>
+							</tr>
+							<tr>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+							</tr>
+							<tr>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+							</tr>
+							<tr>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+							</tr>	
+							<tr>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+							</tr>	
+							<tr>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+							</tr>	
+							<tr>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+							</tr>	
+							<tr>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+							</tr>	
+							<tr>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+							</tr>	
+						</table>							
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+</body>
+</html>

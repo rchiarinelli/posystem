@@ -1,0 +1,68 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<script type="text/javascript" src="../js/dojo/dojo.js" charset="utf-8" djConfig="parseOnLoad:true, isDebug:true"></script>
+<script type="text/javascript" src="../js/json/json2.js"></script>
+<script type="text/javascript" src="../js/po_scripts.js"></script>
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit");
+	dojo.require("dijit.Calendar");
+	dojo.require("dojox.grid.cells.dijit");
+	dojo.require("dojox.data.CsvStore");
+	dojo.require("dojox.grid.DataGrid");
+    dojo.require("dijit.layout.BorderContainer");
+</script>
+<title>RIAN-Sistema de controle de ordens de serviço</title>
+<link rel="stylesheet" href="../styles.css" type="text/css" />
+<style type="text/css">
+    @import "../js/dijit/themes/tundra/tundra.css";
+    @import "../js/dojox/grid/enhanced/resources/tundraEnhancedGrid.css";
+	@import "../js/dojox/grid/resources/Grid.css";
+	@import "../js/dojox/grid/resources/{{ theme }}Grid.css";
+	  .dojoxGrid table {
+	    margin: 0;
+	  }
+    @import "../js/dojo/resources/dojo.css";
+    @import "../js/dojox/grid/_grid/Grid.css";
+    @import "../js/dojox/grid/_grid/tundraGrid.css";        
+    @import "../js/dojox/grid/resources/tundraGrid.css";
+    
+</style></head>
+<body class="tundra">
+
+<div id="wrap">
+	<div class="header">
+		<div class="title">
+			<h1><a href="#">RIAN</a></h1>
+			<h2>Sistema gerenciador de Ordens de Serviços</h2>
+		</div>
+		<div class="nav">
+			<ul>
+				<li><a href="../home.html">Home</a></li>
+				<li class="style1"><a href="../po/production_orders.html">OS</a></li>
+				<li><a href="../request/request_home.html">Pedidos</a></li>
+				<li><a href="#" onclick="openPage('content','../customer/filter_customer.html');">Clientes</a></li>
+				<li><a href="#">Configurações</a></li>
+				<li><a href="#">Contato</a></li>
+			</ul>
+		</div>
+		<div class="clear"></div>
+	</div>
+
+	<div class="pagewrapper">
+		<div class="innerpagewrapper">
+			<div class="page">
+                <div dojoType="dijit.layout.BorderContainer" id="content">
+                </div>
+			</div>
+		</div>
+	</div>
+</div>
+
+	
+	
+</body>
+</html>

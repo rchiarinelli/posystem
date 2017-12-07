@@ -1,0 +1,222 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+    dojo.require("dojox.grid.DataGrid");
+    dojo.require("dojo.data.ItemFileReadStore");
+
+    
+    var layout = [
+                  { field: 'orderCode'   , name: 'C&oacute;digo pedido', width:'auto'  }
+                  ,{ field: 'customerName'  , name: 'Cliente' , width:'auto'}
+                  ,{ field: 'date'      , name: 'Data', width:'auto'}
+                  ,{ field: 'value'   , name: 'Pre&ccedil;o final' , width:'auto'}
+                 ];
+
+    var grid = null;
+    
+	dojo.addOnLoad(function(){
+		loadData();
+	});
+	
+	function loadData() {
+		loadCustomerCombo();
+	}
+	
+	function loadCustomerCombo() {
+		dojo.xhrGet({
+            url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/customer/list/customerswithbillings",
+            handleAs: "json",
+            load: function(data,args){
+	            // success: set heading, run function
+	          var cont;
+	          var value;
+	          var text;
+	          dojo.byId("customer").innerHTML += "<option value=\"-1\">---Selecione---</option>";
+	          if (data.customerList.items.length==null) {
+	        	  dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items.id.$ + "\">" + data.customerList.items.name.$ + "</option>";
+	          } else {
+				for(cont=0; cont < data.customerList.items.length; cont++){
+					dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items[cont].id.$ + "\">" + data.customerList.items[cont].name.$ + "</option>";
+				}            	
+	          }        	
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+	
+	function filterData() {
+		var jsonData = '';
+		var customer = dojo.byId('customer').value;
+		var fromBillingDate = dojo.byId('fromBillingDate').value;
+		var toBillingDate = dojo.byId('toBillingDate').value;
+		
+		jsonData += '{"billingFilter" : {';
+	
+		var hasArg = false;
+		
+		if (customer!=null && customer!='' && customer!='-1') {
+			if (hasArg) {
+				jsonData += ',';
+			}
+			hasArg=true;
+			jsonData += '"customerId" : {"$":"'+customer+'"}';
+		}
+		
+		if ((fromBillingDate!=null && fromBillingDate!='') 
+				&& (toBillingDate!=null && toBillingDate!='')) {
+			if (hasArg) {
+				jsonData += ',';
+			}
+			hasArg=true;
+  			jsonData += '"billedDateRange" : '; 
+  			jsonData += '[ ';
+  			jsonData += '{"$":"'+fromBillingDate+'"}';
+  			jsonData += ',{"$":"'+toBillingDate+'"}';
+  			jsonData += ']';
+		}
+		if (hasArg) {
+			jsonData += ',';
+		}
+		jsonData += '"status" : {"$":"0"}';		
+		
+		jsonData += '}}';
+		
+		executeFilter(jsonData);
+		
+	}
+	
+	
+	function executeFilter(filterData) {
+		//Invocar servico e salvar
+		dojo.xhrPost({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/billing/filter",
+			postData: filterData,
+               headers: {
+                   "Content-Type": "application/json"
+               },
+               handleAs: "text",
+               load: function(response,ioargs){
+					var jsonResponse = JSON.parse(response);
+					buildGrid(jsonResponse);
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\n:" + error);
+            }	         
+	     });			
+	}
+	
+	function buildGrid(response) {
+        if (grid) {
+            grid.destroy();
+            grid = null;
+        }
+        
+        var tempGrid = dijit.byId('filterBillingGrid');
+		if (tempGrid!=null){
+			tempGrid.destroy();
+			tempGrid = null;
+		}
+		
+		showMessages('O filtro retornou '+ response.items.length + ' resultado(s).');
+		
+        var jsonStore =	new dojo.data.ItemFileReadStore({ data: response
+			,urlPreventCache:true });
+		
+        var gotItems = function(items, request){
+            itemCount = items.length
+        };
+
+        if (response.items.length==0){
+        	dojo.byId("gridPanel").style.display='none';
+            return;
+        }
+        jsonStore.fetch({onComplete: gotItems});
+        grid = new dojox.grid.DataGrid({
+            id: 'filterBillingGrid', 
+            store: jsonStore, 
+            autoHeight: 'yes', 
+            structure: layout,
+            errorMessage:'Ocorreu um erro durante a carga dos dados.',
+            selectionMode:'single',
+            clientSort:true
+          });
+
+        dojo.byId("gridPanel").style.display='block';
+		dojo.byId('gridNode').appendChild(grid.domNode);
+		grid.onFetchError = function(err, req) { console.log('Error..: '+err + '. Req..: ' + req.toString()); }
+		grid.startup();   		
+		
+	}
+	
+	function openBill() {
+		console.log('Abrindo fatura');
+		if (grid!=null && grid.selection.getSelected().length > 0){
+			var items = grid.selection.getSelected();
+			var billId = getSelectedCell('id',items);
+			dojo.setObject('billId', billId);
+			console.log(billId);
+			openPage('mainContent','/pages/billing/view_billing_data.html');
+        }	
+	}
+	
+</script>
+</head>
+<body class="tundra">
+
+<div id="wrap">
+	<div class="content">
+		<h3>Filtro de faturamentos em aberto</h3>
+		<div id="messages"></div>					
+		<form action="#">
+			<p>
+				<label for="customer">Cliente com pedidos faturados:</label><br />
+				<select id="customer" name="customer" size="1" style="width: 288px">
+				</select>
+			</p>
+			<table>
+				<tr>
+					<td colspan="2">
+						Data de faturamento:
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<label for="fromDeliverDate">De:</label>
+						<input type="text" name="fromBillingDate" id="fromBillingDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"></input>								
+					</td>
+					<td>
+						<label for="toDeliverDate">At&eacute;:</label>
+						<input type="text" name="toBillingDate" id="toBillingDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"></input>				
+					</td>
+				</tr>
+			</table>
+			<p>
+				<input type="button" id="filter" name="filter" class="formbutton" value="Filtrar"  onclick="filterData();"/>
+				<input type="button" id="back" name="back" class="formbutton" value="Voltar"  onclick="openPage('mainContent','/pages/order/order_home.html')"/>
+			</p>
+		</form>
+		<div id="gridPanel" style="display: none;">
+			<br/>
+			<div id="gridNode" dojoType="dojox.grid.DataGrid" style="height:150px;"></div>
+			<br/>
+			<form action="#">
+				<p>
+				<input type="button" id="view" name="view" class="formbutton" value="Visualizar" onclick="openBill();"/>
+				</p>
+			</form>
+			
+		</div>
+	</div>
+</div>
+</body>
+</html>

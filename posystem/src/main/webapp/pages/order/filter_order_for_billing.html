@@ -1,0 +1,204 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+  	dojo.require("dojox.grid.cells.dijit");
+    dojo.require("dojox.data.CsvStore");
+    dojo.require("dojox.grid.DataGrid");
+    dojo.require("dijit.form.Button");
+
+    var layout = [
+                  { field: 'code'   , name: 'C&oacute;digo'  }
+                  ,{ field: 'customer'  , name: 'Cliente'}
+                  ,{ field: 'qtd'      , name: 'Quantidade'}
+                  ,{ field: 'price'   , name: 'Pre&ccedil;o' }
+                  ,{ field: 'deliverDate'   , name: 'Data entrega' }
+                  ,{ field: 'status'   , name: 'Status' }
+                 ];
+
+    var grid = null;
+    
+	dojo.addOnLoad(function(){
+		loadProperties();
+		console.log(dojo.moduleUrl);
+	});
+
+	
+	function loadProperties(){
+		loadComboCustomers();
+	}
+	function loadComboCustomers(){
+		dojo.xhrGet({
+            url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/customer/list",
+            handleAs: "json",
+            load: function(data,args){
+	            // success: set heading, run function
+	          var cont;
+	          var value;
+	          var text;
+	          dojo.byId("customer").innerHTML += "<option value=\"-1\">---Selecione---</option>";
+	          if (data.customerList.items.length==null) {
+	        	  dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items.id.$ + "\">" + data.customerList.items.name.$ + "</option>";
+	          } else {
+				for(cont=0; cont < data.customerList.items.length; cont++){
+					dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items[cont].id.$ + "\">" + data.customerList.items[cont].name.$ + "</option>";
+				}            	
+	          }
+
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+
+	function filterData(){
+		var messagesBox = dojo.byId("messages");
+		messagesBox.style.display='none';
+		//Montar string json
+		var customer = dojo.byId("customer").value;
+		var poCodes = dojo.byId("poCodes").value;
+
+		var hasArgs = '';
+		var jsonRequest ='{"requestFilter" :{';
+		jsonRequest += '"status" : {"$":"1"}';
+		hasArgs=true;
+		if (customer!=null && customer!='' && customer!='-1'){
+			if (hasArgs){
+				jsonRequest += ',';
+			} else {
+				hasArg=true;	
+			}
+			jsonRequest += '"customer" : {"$":"'+customer+'"}';
+		}
+		if (poCodes!=null && poCodes!=''){
+			if (hasArgs){
+				jsonRequest += ',';
+			} else {
+				hasArg=true;	
+			}
+			jsonRequest += '"orderCodes" : {"$":"'+poCodes+'"}';
+		}
+		jsonRequest += '}';		
+		jsonRequest += '}';
+
+		//Invocar servico e salvar
+		dojo.xhrPost({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/filter",
+			postData: jsonRequest,
+               headers: {
+                   "Content-Type": "application/json"
+               },
+               handleAs: "text",
+               load: function(response,ioargs){
+					var jsonResponse = JSON.parse(response);
+					console.log(jsonResponse);
+					loadGrid(jsonResponse);
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\n:" + error);
+            }	         
+	     });	        
+		
+	}
+
+	function loadGrid(response){
+        if (grid) {
+        	console.log('Destroying grid.');
+            grid.destroy();
+            grid = null;
+        }
+        var tempGrid = dijit.byId('filterRequestGrid');
+		if (tempGrid!=null){
+			tempGrid.destroy();
+			tempGrid = null;
+		}
+		showMessages('O filtro retornou '+ response.items.length + ' resultado(s).');
+
+		var jsonStore = new dojo.data.ItemFileReadStore({ data : response });
+
+        var gotItems = function(items, request){
+            // alert("Total Count of Items in DataStore: " + items.length);
+            itemCount = items.length
+        };
+        console.log('Checking items on response.');
+        if (response.items.length==0){
+        	dojo.byId("gridPanel").style.display='none';
+            return;
+        }
+        console.log('Fetching items on datastore.');
+        jsonStore.fetch({onComplete: gotItems});
+        console.log('Instatiating new DataGrid.');
+        grid = new dojox.grid.DataGrid({
+            id: 'filterRequestGrid', 
+            store: jsonStore, 
+            autoHeight: 'yes', 
+            //sort: sortKeys,
+            structure: layout,
+            errorMessage:'Ocorreu um erro durante a carga dos dados.',
+            selectionMode:'single',
+            clientSort:true
+          });
+		console.log('Building grid.');
+        dojo.byId("gridPanel").style.display='block';
+		dojo.byId('gridNode').appendChild(grid.domNode);
+		grid.onFetchError = function(err, req) { console.log('Error..: '+err + '. Req..: ' + req.toString()); }
+		grid.startup();                             
+	}
+
+	function processRequestBilling(){
+		if (grid!=null && grid.selection.getSelected().length > 0){
+			var items = grid.selection.getSelected();
+			var reqId = getSelectedCell('requestId',items);
+			dojo.setObject('requestId', reqId);
+			openPage('mainContent','/pages//order/add_request_billing_data.html');
+        }		
+	}
+	
+</script>
+
+</head>
+<body class="tundra">
+
+<div id="wrap">
+	<div class="content">
+		<h3>Faturar pedido</h3>
+		<h5>Selecione um pedido no resultado do filtro</h5>
+		<div id="messages"></div>					
+		<form action="#">
+			<p>
+				<label for="customer">Cliente:</label><br />
+				<select id="customer" name="customer" size="1" style="width: 288px">
+				</select>
+			</p>
+			<p>
+				<label for="poCodes">Codigo(s):</label><br />
+				<input type="text" name="poCodes" id="poCodes" size="50" maxlength="255"/>
+			</p>
+			<p>
+			<br/>
+			<input type="button" id="filter" name="filter" class="formbutton" value="Filtrar"  onclick="filterData()"/>
+			<input type="button" id="back" name="back" class="formbutton" value="Voltar"  onclick="openPage('mainContent','/pages/order/order_home.html')"/>
+			</p>
+		</form>
+	
+		<div id="gridPanel" style="display: none;">
+			<div id="gridNode" dojoType="dojox.grid.DataGrid" style="height:150px;"></div>
+			<br/>
+			<form action="#">
+				<p>
+					<input type="button" id="startBilling" class="formbutton"  name="startBilling" value="Faturar" onclick="processRequestBilling()"/>
+				</p>
+			</form>				
+		</div>
+	</div>
+</div>
+</body>
+</html>

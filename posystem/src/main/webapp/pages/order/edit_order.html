@@ -1,0 +1,179 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+  	dojo.require("dojox.grid.cells.dijit");
+    dojo.require("dojox.data.CsvStore");
+    dojo.require("dojox.grid.DataGrid");
+    dojo.require("dijit.form.Button");
+
+    
+	dojo.addOnLoad(function(){
+		if (checkURL()){
+			loadProperties();			
+		} else {
+			console.warn('URL does not contains the requestId parameter.');
+			openPage('mainContent','/pages/order/filter_order.html');
+		}
+	});
+
+	function checkURL(){
+		var requestId = dojo.getObject('requestId');
+		if (requestId==null || requestId==''){
+			return false;
+		}
+		return true;			
+	}
+
+	function loadProperties(){
+		loadRequest();
+	}
+
+	function loadRequest(){
+		var requestId = dojo.getObject('requestId');
+		console.log('RequestID..: ' + requestId.toString());
+		var url= dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/get/" + requestId.toString();
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                console.log(response);
+                if (response.serviceResponse.status.$=='0'){
+	                dojo.html.set(dojo.byId("poCode"), response.serviceResponse.viewBeanResponse.code.$,{	parseContent: true	});
+	                dojo.byId('customer').value=response.serviceResponse.viewBeanResponse.customer.$;
+	                dojo.byId('openDate').value=response.serviceResponse.viewBeanResponse.openDate.$;
+	                if (response.serviceResponse.viewBeanResponse.price!=null && 
+	    	                response.serviceResponse.viewBeanResponse.price.$!=''){
+	                	dojo.byId('price').value=response.serviceResponse.viewBeanResponse.price.$;
+                	}
+	                if (response.serviceResponse.viewBeanResponse.deliverDate!=null && 
+	    	                response.serviceResponse.viewBeanResponse.deliverDate.$!=''){
+	                	dojo.byId('deliverDate').value=response.serviceResponse.viewBeanResponse.deliverDate.$;
+                	}
+                	
+	                dojo.byId('qtd').value=response.serviceResponse.viewBeanResponse.qtd.$;
+	                dojo.byId('description').value=unescape(response.serviceResponse.viewBeanResponse.description.$);
+	                dojo.byId('status').value=response.serviceResponse.viewBeanResponse.status.$;
+                } else if (response.serviceResponse.status.$=='1'){
+					showMessages(response.serviceResponse.message.$);
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+
+	function updateRequest(){
+		//Montar string json
+		var description = dojo.byId("description").value;
+		var price = dojo.byId("price").value;
+		var qtd = dojo.byId("qtd").value;
+		var deliverDate = dojo.byId("deliverDate").value;
+		var requestId = dojo.getObject('requestId');
+
+		var jsonRequest = '{"update_request" :{"requestId":{"$":"'+requestId+'"}';
+		if (description!=''){
+			jsonRequest += ', "description": {"$" : "'+escape(description)+'"}';
+		}
+		if (deliverDate!=''){
+			jsonRequest += ',"deliverDate": {"$" : "'+deliverDate+'"}';
+		}
+		if (price!=''){
+			jsonRequest += ',"price":{"$" : "'+price+'"}';
+		}
+		if (qtd!=''){
+			jsonRequest += ',"qtd":{"$" : "'+qtd+'"}';
+		}
+		jsonRequest += '}}';
+
+		//Invocar servico e salvar
+		dojo.xhrPut({
+			url:  dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/update",
+			putData: jsonRequest,
+            headers: {
+                "Content-Type": "application/json"
+            },
+            handleAs: "json",
+            load: function(data,ioargs){
+                console.log(data);
+            	if (data.serviceResponse.status.$=='0'){
+            		openPage('mainContent','/pages/order/filter_order.html');
+            	}else if (data.serviceResponse.status.$=='1' ){
+            		showMessages(data.serviceResponse.message.$);
+            	} 
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\nErro:" + error);
+            }	         
+	     });	        
+	}
+	function showMessages(msg){
+		//messagesBox.innerHtml=msg;
+		//messagesBox.textContent=msg;
+		dojo.byId("messages").style.display='block';		
+		console.log(msg);
+	  	dojo.html.set(dojo.byId("messages"), msg, 
+	  		  		{
+			      		parseContent: true
+			      	});
+	}	
+			
+</script>
+</head>
+<body class="tundra">
+
+<div id="wrap">
+	<div class="content">
+		<div id="messages"></div>
+		<h3>Pedido: <span id="poCode"></span></h3>
+		<br/>
+		<form action="#">
+			<p><label for="customer">Cliente:</label><br />
+				<input type="text" name="customer" id="customer" readonly="readonly" />					
+			</p>
+
+			<p><label for="openDate">Data abertura:</label><br />
+			<input type="text" name="openDate" id="openDate" readonly="readonly" /></p>
+						
+			<p><label for="description">Descri&ccedil;&atilde;o:</label><br />
+				<textarea id="description" name="description" rows="5" cols="50">
+				</textarea>
+			</p>
+			<p><label for="deliverDate">Data de entrega:</label><br />
+				<input type="text" name="deliverDate" id="deliverDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"/>
+			</p>						
+			<table>
+				<tr>
+					<td>
+						<p><label for="qtd">Quantidade:</label><br />
+						<input type="text" name="qtd" id="qtd"/></p>
+					</td>
+					<td>
+						<p><label for="price">Pre&ccedil;o:</label><br />
+						<input type="text" name="price" id="price"/><br /></p>
+					</td>
+				</tr>
+			</table>
+			<p><label for="status">Status:</label><br />
+				<input type="text" name="status" id="status" readonly="readonly"/></p>
+			</p>					
+			<p>
+				<input type="button" id="update" name="update" class="formbutton" value="Atualizar" onclick="updateRequest();"/>
+				<input type="button" id="cancel" name="cancel" class="formbutton" value="Cancelar"  onclick="openPage('mainContent','/pages/order/filter_order.html');"/>
+			</p>
+		</form>
+	</div>
+</div>
+</body>
+</html>

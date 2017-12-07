@@ -1,0 +1,321 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+    dojo.require("dijit.form.Form");
+    dojo.require("dijit.form.Button");
+    dojo.require("dijit.form.ValidationTextBox");
+    dojo.require("dijit.form.DateTextBox");
+    dojo.require("dijit.form.NumberTextBox");
+    dojo.require("dijit.Tooltip");
+	
+	dojo.addOnLoad(function(){
+		if (checkURL()){
+			loadProperties();			
+		} else {
+			openPage('mainContent','/pages/po/filter_po.html');
+		}
+	});
+
+	function checkURL(){
+		var poId = dojo.getObject("poId");
+		console.log('PO ID..:' +poId);
+		if (poId==null || poId==''){
+			return false;
+		}
+		return true;			
+	}
+
+
+	function loadProperties(){
+		loadPO();
+		handleCheckoutButton();
+		handleFinalizeButton();
+		handleEditButton();
+	}
+
+	function loadPO(){
+		var poId = dojo.getObject("poId");
+		var url= dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/get/" + poId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                ///console.log(response);
+				if (response.poServiceResponse.status.$=='0'){
+	                dojo.html.set(dojo.byId("osNumber"), response.poServiceResponse.viewBean.poNumber.$,{	parseContent: true	});
+	                dojo.byId('customer').value=response.poServiceResponse.viewBean.customer.$;
+	                dojo.byId('request').value=response.poServiceResponse.viewBean.request.$;
+
+	        		var url= dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/get/" + response.poServiceResponse.viewBean.requestId.$;
+	        		dojo.xhrGet({
+	                    url: url,
+	                    headers: {
+	                        "Content-Type": "text/plain"
+	                    },
+	                    handleAs: "json",
+	                    load: function(data,args){
+	                    	console.log('Value returned ' + data);
+	        				if (data.serviceResponse.status.$=='0'){
+	        	                var descReq = 'Descrição: ';
+	        	                descReq+=unescape(data.serviceResponse.viewBeanResponse.description.$);
+	        	                new dijit.Tooltip({
+	        	                    connectId: ["request"],
+	        	                    label: descReq
+	        	                });
+	        				}
+	                    },
+	                    // if any error occurs, it goes here:
+	                    error: function(error,args){
+	                        console.warn("error!",error);
+	                    }
+	                });
+	                
+					dojo.byId('dueDate').value=response.poServiceResponse.viewBean.dueDate.$;
+					dojo.byId('estTime').value=response.poServiceResponse.viewBean.estimatedTime.$;
+					dojo.byId('qtdPieces').value=response.poServiceResponse.viewBean.qtd.$;
+					if (response.poServiceResponse.viewBean.sketchNumber!=null
+								&& response.poServiceResponse.viewBean.sketchNumber.$!=''){
+						dojo.byId('sketchNumber').value=response.poServiceResponse.viewBean.sketchNumber.$;
+					}
+					dojo.byId('status').value=response.poServiceResponse.viewBean.status.$;
+					dojo.byId('openDate').value=response.poServiceResponse.viewBean.openDate.$;
+				}else if (response.poServiceResponse.status.$=='1'){
+					showMessages(response.serviceResponse.message.$);
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });		
+	}
+
+	function editPO(){
+		openPage('mainContent','/pages/po/edit_po.html');
+	}
+
+	function handleCheckoutButton() {
+		var poId = dojo.getObject("poId");
+		var url= dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/cancheckout/" + poId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                console.log(response);
+                var btCheckout = dojo.byId('checkout');
+				if (response.keyValueBean.value.$=='0'){
+					btCheckout.style.display='none';
+					btCheckout.disabled='disabled';
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });			
+	}
+	function handleFinalizeButton() {
+		var poId = dojo.getObject("poId");
+		var url=dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/canfinalize/" + poId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                console.log(response);
+                var btClose = dojo.byId('close');
+				if (response.keyValueBean.value.$=='0'){
+					btClose.style.display='none';
+					btClose.disabled='disabled';
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });			
+	}
+	function handleEditButton() {
+		var poId = dojo.getObject("poId");
+		var url=dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/canedit/" + poId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                console.log(response);
+                var btEdit = dojo.byId('edit');
+				if (response.keyValueBean.value.$=='0'){
+					btEdit.style.display='none';
+					btEdit.disabled='disabled';
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });			
+	}
+	
+	function checkoutPO() {
+		var poId = dojo.getObject("poId");
+		var url=dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/checkout/" + poId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+				if (response.serviceResponse.status.$=='0'){
+					loadProperties();
+					var pagePath =dojo.getObject("basePath") + '/pages/po/print_po.html?poId='+poId+'&subscriberId='+dojo.getObject("subscriber")+'&basePath=' + escape(dojo.getObject("basePath"));
+					console.log(pagePath);
+					window.open(pagePath,'Modo de impressão','width=800,height=600,resizable=no,menubar=yes');
+				} else if (response.serviceResponse.status.$=='1'){
+					showMessages(response.serviceResponse.message.$);
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });			
+	}
+
+	function finalizePO() {
+		var poId = dojo.getObject("poId");
+		var url=dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/finalize";
+		var jsonRequest = '{"po" :{';
+		jsonRequest += '"poId": {"$" : "' + poId + '"}';
+		jsonRequest += '}}';
+		dojo.xhrPost({
+			   url: url,
+			   postData: jsonRequest,
+               headers: {
+                   "Content-Type": "application/json"
+               },
+               handleAs: "json",
+               load: function(data,ioargs){
+                   console.log(data);
+               		if (data.serviceResponse.status.$=='0'){
+               			showMessages(data.serviceResponse.message.$);
+               			loadProperties();	
+               		}else if (data.serviceResponse.status.$=='1' ){
+               			showMessages(data.serviceResponse.message.$);
+               		} 
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\nErro:" + error);
+            }	         
+	     });		
+	}
+
+	function openRequest(){
+		var poId = dojo.getObject("poId");
+		var url=dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/get/" + poId;
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+                ///console.log(response);
+				if (response.poServiceResponse.status.$=='0'){
+					var reqId = response.poServiceResponse.viewBean.requestId.$;
+					dojo.setObject('requestId',reqId);
+					openPage('mainContent','/pages/order/view_order.html');
+				}
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });		
+	}
+	
+</script>
+</head>
+<body class="tundra">
+
+<div id="wrap">
+			<div class="content">
+				<h3>Ordem de servi&ccedil;o <span id="osNumber"></span></h3>
+				<div id="messages"></div>					
+				<form action="#" method="post" id="addPOForm">
+					<p><label for="customer">Cliente:</label>&nbsp;
+						<input type="text" name="customer" id="customer" readonly="readonly" />
+					</p>
+					<p><label for="request">Pedido:</label>&nbsp;
+						<input type="text" name="request" id="request" readonly="readonly" />
+						<span id="requestDetail">
+							<a href="#" onclick="openRequest();">
+								Visualizar
+							</a>
+						</span>						
+					</p>
+
+					<p><label for="openDate">Data abertura:&nbsp;
+					<input type="text" name="openDate" id="openDate" readonly="readonly"/>&nbsp;
+					</p>
+
+					<p><label for="dueDate">Data estimada de entrega:&nbsp;
+					<input type="text" name="dueDate" id="dueDate" readonly="readonly"/>&nbsp;
+					</p>
+
+
+					<table>
+						<tr>
+							<td>
+
+								<p><label for="estTime">Tempo estimado(em horas):</label>&nbsp;
+									<input id="estTime" type="text" name="estTime" 
+										readonly="readonly"/><br />									
+								</p>
+
+								
+							</td>
+							<td>
+
+								<p><label for="qtdPieces">Quantidade pe&ccedil;as:</label>&nbsp;
+								<input type="text" name="qtdPieces" id="qtdPieces" readonly="readonly"/></p>
+
+							
+							</td>
+						</tr>
+						
+					</table>
+					<p><label for="sketchNumber">Desenho n&uacute;mero:</label><br />
+					<input type="text" name="sketchNumber" id="sketchNumber" readonly="readonly"/><br/></p>
+					
+					<p><label for="status">Status:</label>&nbsp;<input type="text" name="status" id="status" readonly="readonly" />						
+					</p>
+					<p>
+						<input type="button" id="edit" name="edit" class="formbutton" value="Editar" onclick="editPO();"/>
+						<input type="button" id="checkout" name="checkout" class="formbutton" value="Emitir" onclick="checkoutPO();"/>
+						<input type="button" id="close" name="close" class="formbutton" value="Concluir OS" onclick="finalizePO();"/>
+						<input type="button" id="back" name="back" class="formbutton" value="Voltar" onclick="openPage('mainContent','/pages/po/filter_po.html');" />						
+					</p>
+				</form>
+			</div>
+</div>
+</body>
+</html>

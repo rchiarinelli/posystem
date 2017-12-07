@@ -1,0 +1,271 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+    dojo.require("dojox.grid.DataGrid");
+    dojo.require("dojo.data.ItemFileReadStore");
+    dojo.require("dijit.Dialog");
+
+    
+	dojo.addOnLoad(function(){
+		loadBillData();
+		loadInstallments();
+	});
+	
+	function loadBillData() {
+		var billId = dojo.getObject('billId');
+		dojo.xhrGet({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/billing/get/" + billId,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(data,args){
+            	console.log(data);
+            	if (data.billingService.status.$=='0'){
+            		var viewBean = data.billingService.viewBean;
+            		dojo.html.set(dojo.byId("orderCode"), viewBean.orderCode.$,{	parseContent: true	});
+            		
+            		dojo.html.set(dojo.byId("customer"), viewBean.customerName.$,{	parseContent: true	});
+            		dojo.html.set(dojo.byId("billingDate"), viewBean.date.$,{	parseContent: true	});
+            		dojo.html.set(dojo.byId("value"), viewBean.value.$,{	parseContent: true	});
+            		dojo.html.set(dojo.byId("paymentType"), viewBean.paymentType.$,{	parseContent: true	});
+            	} 
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });		
+	}
+	
+	function loadInstallments() {
+		var billId = dojo.getObject('billId');
+		dojo.xhrGet({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/installments/get/by/billingid/" + billId,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+            	//console.log(response);
+            	buildInstallmentsTable(response);
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });			
+	}
+	
+	function buildInstallmentsTable(response) {
+    	if (response!=null) {
+    		dojo.empty("installments");
+    		
+        	var table = dojo.create("table", null, "installments");
+        	//gerar thead
+        	var thead = dojo.create("thead",null,table);
+        	var tr = dojo.create("tr",null,thead);
+
+        	dojo.create("th",{ innerHTML: "Situa&ccedil;&atilde;o" },tr);
+        	dojo.create("th",{ innerHTML: "Data" },tr);
+        	dojo.create("th",{ innerHTML: "Valor" },tr);
+        	dojo.create("th",{ innerHTML: "&nbsp;" },tr);
+
+        	var tbody = dojo.create("tbody",null,table);
+        	var bodyTr = null;
+        	
+        	console.log(response.length);
+        	var installment = null;
+           	if (response.length==null) {
+           		bodyTr = dojo.create("tr",null,tbody);
+           		createRow(bodyTr, response.installment);
+           	} else  {
+               	dojo.forEach(response, function(data){
+               		bodyTr = dojo.create("tr",null,tbody);
+               		createRow(bodyTr, data.installment);
+				}); 	               	
+           	}
+    	}		
+	}
+	
+	
+	function createRow(bodyTr, installment) {
+    	var statusTd = dojo.create("td"
+    			,null
+    			,bodyTr);
+    	getStateImage(installment,statusTd)
+    	
+    	var dateTd = dojo.create("td"
+    			,{ innerHTML: installment.date.$ },bodyTr);
+    	
+    	var valueTd = dojo.create("td"
+    			,{ innerHTML: installment.value.$ },bodyTr);
+    	
+    	var actionTd = dojo.create("td"
+    			,null
+    			,bodyTr);
+    	getActionImage(installment,actionTd);
+    	
+    	dojo.attr(statusTd,"align","center");
+    	dojo.attr(dateTd,"align","center");
+    	dojo.attr(valueTd,"align","center");
+    	dojo.attr(actionTd,"align","center");
+	}
+	
+	function getStateImage(installment,parent) {
+		var img = dojo.create("img",null,parent);
+		dojo.attr(img,"height","20px");
+		dojo.attr(img,"width","20px");
+		
+		if (installment.statusIntValue.$=='0') {
+			dojo.attr(img,"alt","Parcela pendente");
+			dojo.attr(img,"src", dojo.getObject("basePath") +  "/images/yellow_point.gif");
+			dojo.attr(img,"title","Parcela pendente");
+		} else if (installment.statusIntValue.$=='1') {
+			dojo.attr(img,"alt","Parcela paga");
+			dojo.attr(img,"src", dojo.getObject("basePath") + "/images/green_point.gif");
+			dojo.attr(img,"title","Parcela paga");
+		}
+		return img;
+	}
+	
+	function getActionImage(installment,parent) {
+		var img = dojo.create("img",null,parent);
+		dojo.attr(img,"height","25px");
+		dojo.attr(img,"width","35px");
+
+		if (installment.statusIntValue.$=='0') {
+			dojo.attr(img,"alt","Baixa na parcela");
+			dojo.attr(img,"src", dojo.getObject("basePath") + "/images/money.gif");
+			dojo.attr(img,"title","Clique aqui para dar baixa na parcela");
+			dojo.attr(img,"onclick","openPaymentWidget("+installment.id.$+")");
+		} 
+		return img;
+	}
+	
+	
+	function payInstallment() {
+		var paidValue = dojo.byId('newValue').value;
+		var installmentId = dojo.byId('installmentId').value;
+		
+		var json = '{"payInstallment": {';
+		json+='"installmentId":{"$":"'+installmentId+'"}';
+		json+=',"paidValue":{"$":"'+paidValue+'"}';
+		json+='}}';
+		
+		//Invocar servico e salvar
+		dojo.xhrPut({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/installments/pay",
+			postData: json,
+               headers: {
+                   "Content-Type": "application/json"
+               },
+               handleAs: "json",
+               load: function(data,ioargs){
+	                console.log(data);
+	               	if (data.serviceResponse.status.$=='0'){
+	               		dijit.byId("paymentDialog").hide();
+	               		loadInstallments();
+	               		showMessages("Parcela paga.");
+	               	}else if (data.serviceResponse.status.$=='1' ){
+	               		showMessages(data.serviceResponse.message.$);
+	               	} 
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\nErro:" + error);
+            }	         
+	     });	
+	}
+	
+	function openPaymentWidget(instId) {
+		var paymentForm = dijit.byId("paymentDialog");
+		var origValueTxt = dojo.byId('originalValue');
+		var newValueTxt = dojo.byId('newValue');
+		var installmendIdHd = dojo.byId('installmentId');
+		
+		var url= dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/installments/get/" + instId;
+		var installment = null
+		dojo.xhrGet({
+            url: url,
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            handleAs: "json",
+            load: function(response,args){
+            	installment = response.installmentDashboard.installment;
+    			origValueTxt.value = installment.value.$;
+    			newValueTxt.value = installment.value.$;
+    			installmendIdHd.value = installment.installmentId.$;
+    			
+    			newValueTxt.focus();
+    			
+    			paymentForm.show();
+
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages(error);
+            }
+        });			
+		
+	}
+	
+</script>
+    
+</head>
+<body>
+<div id="wrap">
+	<div class="content">
+		<div id="messages"></div><br/>
+		<h3>Dados da fatura do pedido: <span id="orderCode"></span></h3>
+		<br/>
+		<p>Cliente:
+			<span id="customer"></span>					
+		</p>
+
+		<p>Data faturamento:
+			<span id="billingDate"></span>
+		</p>
+					
+		<p>Valor:
+			<span id="value"></span>		
+		</p>
+		<p>Tipo de pagamento:
+			<span id="paymentType"></span>
+		</p>
+		<div id="installments" style="overflow: auto; height: 200px;" >
+
+		</div>
+		<br/>
+		<form action="#" name="viewBillingDataForm" id="viewBillingDataForm">
+			<input type="button" id="back" name="back" value="Voltar" class="formbutton" onclick="openPage('mainContent','/pages/billing/filter_billing.html');" />
+		</form>
+	</div>
+</div>
+	<div dojoType="dijit.Dialog" id="paymentDialog" title="Dados da pagamento" style="width: 450px;height:270px;">
+		<p>
+			Informe o valor do pagamento da parcela:
+		</p>
+		<form id="paymentForm" name="paymentForm" action="#">
+			<input type="hidden" id="installmentId" name="installmentId"/>
+			<p>
+				<label for="originalValue">Valor base:</label>
+				<input type="text" id="originalValue" name="originalValue" size="10" maxlength="10" readonly="readonly"/>
+			</p>
+			<p>
+				<label for="newValue">Valor pago:</label>
+				<input type="text" id="newValue" name="newValue" size="10" maxlength="10"/>
+			</p>
+			<input type="button" id="process" name="process" value="Processar pagamento" class="formbutton" onclick="payInstallment();" />
+			<input type="button" id="cancel" name="cancel" value="Cancelar" class="formbutton" onclick="dijit.byId('paymentDialog').hide();" />
+		</form>
+	</div>
+</body>
+
+</html>

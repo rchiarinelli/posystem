@@ -1,0 +1,248 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+<script type="text/javascript">
+	dojo.require("dojo.html");
+	dojo.require("dijit.dijit"); 
+	dojo.require("dijit.Calendar");
+    dojo.require("dijit.form.Form");
+    dojo.require("dijit.form.Button");
+    dojo.require("dijit.form.ValidationTextBox");
+    dojo.require("dijit.form.DateTextBox");
+    dojo.require("dijit.form.NumberTextBox");
+	
+	dojo.addOnLoad(function(){
+		loadProperties();
+	});
+
+	
+	function loadProperties(){
+		loadComboCustomers();
+		loadCurrentDate();
+		getPOCode();
+	}
+	
+	function loadComboCustomers(){
+		dojo.xhrGet({
+            url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/customer/list",
+            handleAs: "json",
+            load: function(data,args){
+	            // success: set heading, run function
+	          var cont;
+	          var value;
+	          var text;
+	          dojo.byId("customer").innerHTML += "<option value=\"-1\">---Selecione---</option>";
+	          if (data.customerList.items.length==null) {
+	        	  dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items.id.$ + "\">" + data.customerList.items.name.$ + "</option>";
+	          } else {
+				for(cont=0; cont < data.customerList.items.length; cont++){
+					dojo.byId("customer").innerHTML += "<option value=\"" + data.customerList.items[cont].id.$ + "\">" + data.customerList.items[cont].name.$ + "</option>";
+				}            	
+	          }
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });
+	}
+	
+	function loadCurrentDate(){
+		dojo.xhrGet({
+            url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/utilities/current_server_date",
+            handleAs: "json",
+            load: function(data,args){
+	            // success: set heading, run function
+	          var cont;
+	          var value;
+	          var text;
+	          dojo.byId("openDate").value = data.utility.value.$;
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                console.warn("error!",error);
+            }
+        });		
+	}
+
+
+	function getPOCode(){
+		dojo.xhrGet({
+            url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/code",
+            handleAs: "json",
+            load: function(data,args){
+            	dojo.byId('osNumber').value=data.poCode.value.$;
+            },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+                showMessages("Ocorreu um erro durante a recuperação do código da Ordem de Serviço." + error);
+            }
+        });
+	}
+
+	function loadRequest(){
+		var cbCustomer = dojo.byId('customer');
+		if (cbCustomer.value!=null 
+				&& cbCustomer.value!=''
+					&& cbCustomer.value!='-1'){
+			dojo.xhrGet({
+				url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/order/get/openordersbycustomer/" + cbCustomer.value,
+	            handleAs: "json",
+	            load: function(data,args){
+					console.log(data);
+		          	var cont;
+			        var value;
+			        var text;
+			        dojo.byId("request").innerHTML = "";
+			        dojo.byId("request").innerHTML += "<option value=\"-1\">---Selecione---</option>";
+			        for(cont=0; cont < data.length; cont++){
+				      	console.log(data[cont]);
+		          		dojo.byId("request").innerHTML += "<option value=\"" + data[cont].request_add.requestId.$ + "\">" + data[cont].request_add.code.$ + "</option>";
+			        } 
+	            },
+	            // if any error occurs, it goes here:
+	            error: function(error,args){
+	                showMessages("Ocorreu um erro durante a recuperação dos pedidos." + error);
+	            }
+	        });
+		} else if (cbCustomer.value!=null 
+				&& cbCustomer.value!=''
+					&& cbCustomer.value=='-1'){
+			dojo.byId("request").innerHTML ="";
+		}
+	}
+
+
+	function savePO(){
+		dojo.byId("messages").style.display='none';
+		//Montar string json
+		var poCode = dojo.byId("osNumber").value;
+		var request = dojo.byId("request").value;
+		var dueDate = dojo.byId("dueDate").value;
+		var estimatedTime = dojo.byId("estTime").value;
+		var qtd = dojo.byId("qtdPieces").value;
+		var sketchNumber = dojo.byId("sketchNumber").value;
+
+		var jsonRequest = '{"po_add" :{'; 
+		if (poCode!=''){
+			jsonRequest += '"poNumber": {"$" : "'+poCode+'"}';
+		}
+		if (request!=''){
+			jsonRequest += ',"request": {"$" : "'+request+'"}';
+		}
+		if (dueDate!=''){
+			jsonRequest += ',"dueDate": {"$" : "'+dueDate+'"}';
+		}
+		if (estimatedTime!=''){
+			jsonRequest += ',"estimatedTime":{"$" : "'+estimatedTime+'"}';
+		}
+		if (qtd!=''){
+			jsonRequest += ',"qtd":{"$" : "'+qtd+'"}';
+		}
+		if (sketchNumber!=''){
+			jsonRequest += ',"sketchNumber":{"$" : "'+sketchNumber+'"}';
+		}
+		jsonRequest += '}}';
+
+		//Invocar servico e salvar
+		dojo.xhrPost({
+			url: dojo.getObject("basePath") + "/services/" + dojo.getObject("subscriber") + "/po/add",
+			postData: jsonRequest,
+               headers: {
+                   "Content-Type": "application/json"
+               },
+               handleAs: "json",
+               load: function(data,ioargs){
+                   console.log(data);
+               	if (data.serviceResponse.status.$=='0'){
+               		openPage('mainContent','/pages/po/production_orders.html');
+               	}else if (data.serviceResponse.status.$=='1' ){
+               		showMessages(data.serviceResponse.message.$);
+               	} 
+	         },
+            // if any error occurs, it goes here:
+            error: function(error,args){
+    			showMessages("Erro ao salvar no servidor. Tente novamente mais tarde.\nErro:" + error);
+            }	         
+	     });		
+	}
+
+
+	
+	function showMessages(msg){
+		dojo.byId("messages").style.display='block';		
+		console.log(msg);
+	  	dojo.html.set(dojo.byId("messages"), msg, 
+	  		  		{
+			      		parseContent: true
+			      	});
+	}
+</script>
+</head>
+<body class="tundra">
+
+<div id="wrap">
+	<div class="content">
+		<h3>Nova OS</h3>
+		<div id="messages"></div>					
+		<form action="#" method="post" id="addPOForm">
+			<p><label for="osNumber">Ordem de servi&ccedil;o:</label><br />
+			<input type="text" name="osNumber" id="osNumber" readonly="readonly"/><br /></p>
+
+			<p><label for="customer">Cliente:</label><span class="errorSign">*</span><br />
+			<select id="customer" name="customer" size="1" style="width: 288px" onchange="loadRequest();">
+			</select>
+			</p>
+
+			<p><label for="request">Pedido:</label><span class="errorSign">*</span><br />
+			<select id="request" name="request" size="1" style="width: 288px">
+			</select>
+			</p>
+
+			<table>
+				<tr>
+					<td>
+
+						<p><label for="openDate">Data abertura:</label><br />
+						<input type="text" name="openDate" id="openDate" readonly="readonly" /><br /></p>
+						
+					</td>
+					<td>
+						<p><label for="dueDate">Data estimada de entrega:</label><span class="errorSign">*</span><br />
+						<input type="text" name="dueDate" id="dueDate" dojoType="dijit.form.DateTextBox" constraints="{datePattern:'dd/MM/yyyy'}"/><br /></p>
+					</td>
+				</tr>
+			</table>
+
+
+			<table>
+				<tr>
+					<td>
+
+						<p><label for="estTime">Tempo estimado(em horas):</label><span class="errorSign">*</span><br />
+							<input id="estTime" type="text" name="estTime" /><br />									
+						</p>
+
+						
+					</td>
+					<td>
+
+						<p><label for="qtdPieces">Quantidade pe&ccedil;as:</label><span class="errorSign">*</span><br />
+						<input type="text" name="qtdPieces" id="qtdPieces"/><br /></p>
+
+					
+					</td>
+				</tr>
+				
+			</table>
+			<p><label for="sketchNumber">Desenho n&uacute;mero:</label><br />
+			<input type="text" name="sketchNumber" id="sketchNumber"/><br /></p>
+			<p><input type="button" id="save" name="save" class="formbutton" value="Salvar" onclick="savePO();" />
+			<input type="button" id="cancel" name="cancel" class="formbutton" value="Cancelar" onclick="openPage('mainContent','/pages/po/production_orders.html');"/></p>
+		</form>
+	</div>
+</div>
+</body>
+</html>
